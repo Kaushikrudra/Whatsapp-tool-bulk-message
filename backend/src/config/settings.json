@@ -1,0 +1,10 @@
+{
+  "minDelaySec": 3,
+  "maxDelaySec": 8,
+  "dailyLimit": 200,
+  "defaultCountryCode": "91",
+  "sendWindowEnabled": false,
+  "sendWindowStart": "10:00",
+  "sendWindowEnd": "19:00",
+  "webhookUrl": ""
+}

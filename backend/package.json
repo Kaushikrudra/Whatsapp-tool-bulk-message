@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-bulk-backend",
+  "version": "1.0.0",
+  "description": "WhatsApp Bulk Messaging Tool Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.23",
+    "bull": "^4.16.5",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ioredis": "^5.11.1",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.11.5",
+    "pino": "^8.19.0",
+    "qrcode": "^1.5.3",
+    "xlsx": "^0.18.5"
+  }
+}
