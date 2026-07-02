@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const LOGIN_URL = 'http://localhost:5000/api/auth/login';
+const LOGIN_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/login`;
 
 function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
