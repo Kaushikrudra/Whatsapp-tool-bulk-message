@@ -11,7 +11,7 @@ let sock = null;
 let connectionStatus = 'disconnected'; // "connecting", "connected", "disconnected", "reconnecting"
 let qrCodeBase64 = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 3;
+const MAX_RECONNECT_ATTEMPTS = 999;
 
 /**
  * Initializes the WhatsApp socket connection and configures event listeners.
@@ -25,7 +25,8 @@ async function initWhatsApp(isReconnect = false) {
 
   // Update status
   if (!isReconnect) {
-    connectionStatus = 'connecting';
+    const credsExist = fs.existsSync(path.join(AUTH_INFO_DIR, 'creds.json'));
+    connectionStatus = credsExist ? 'connecting' : 'disconnected';
   }
   qrCodeBase64 = null;
 
@@ -111,28 +112,14 @@ async function initWhatsApp(isReconnect = false) {
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
-          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts++;
-            connectionStatus = 'reconnecting';
-            console.log(`Connection closed. Attempting reconnect ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in 5 seconds...`);
-            
-            // Wait 5 seconds before trying to reconnect
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-            initWhatsApp(true);
-          } else {
-            connectionStatus = 'disconnected';
-            console.warn(`!!! ALERT: WhatsApp connection failed after ${MAX_RECONNECT_ATTEMPTS} reconnect attempts. Please scan QR again or check connection. !!!`);
-            
-            // Log connection failure
-            try {
-              const { pool } = require('../config/db');
-              await pool.query(
-                "INSERT INTO campaign_logs (campaign_id, event_type, message, created_at) VALUES (NULL, 'warning', 'WhatsApp connection disconnected. Automatic retries failed.', now())"
-              );
-            } catch (dbErr) {
-              console.error('Failed to log WhatsApp disconnect event:', dbErr.message);
-            }
-          }
+          reconnectAttempts++;
+          connectionStatus = 'reconnecting';
+          const delayMs = reconnectAttempts <= 3 ? 5000 : 10000;
+          console.log(`Connection closed. Attempting reconnect ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000} seconds...`);
+          
+          // Wait before trying to reconnect
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          initWhatsApp(true);
         } else {
           connectionStatus = 'disconnected';
           console.log('WhatsApp disconnected (logged out). Cleaning session credentials and generating new QR...');
