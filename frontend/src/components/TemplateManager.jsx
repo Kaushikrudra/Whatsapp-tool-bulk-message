@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FileText, Save, Trash2, Edit3, X, Sparkles } from 'lucide-react';
 
-const BACKEND_URL = 'http://localhost:5000/api/templates';
+const BACKEND_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/templates`;
 
 function TemplateManager() {
   const [templates, setTemplates] = useState([]);
