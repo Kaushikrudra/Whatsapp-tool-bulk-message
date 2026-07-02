@@ -4,7 +4,7 @@ const { sendTextMessage } = require('../whatsapp/connection');
 
 // Initialize the Bull queue backed by local Redis (redis://localhost:6379)
 const campaignQueue = new Bull('campaign-sender', {
-  redis: { host: 'localhost', port: 6379 }
+  redis: process.env.REDIS_URL || { host: 'localhost', port: 6379 }
 });
 
 /**
