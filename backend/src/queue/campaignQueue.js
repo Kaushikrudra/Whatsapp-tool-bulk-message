@@ -1,6 +1,7 @@
 const Bull = require('bull');
 const { pool } = require('../config/db');
 const { sendTextMessage } = require('../whatsapp/connection');
+const { getSettings } = require('../config/settings');
 
 // Initialize the Bull queue backed by local Redis (redis://localhost:6379)
 const campaignQueue = new Bull('campaign-sender', {
@@ -16,6 +17,49 @@ function injectZeroWidthSpace(text) {
   const len = text.length;
   const randomIndex = Math.floor(Math.random() * (len + 1));
   return text.substring(0, randomIndex) + '\u200B' + text.substring(randomIndex);
+}
+
+/**
+ * Checks if the current local time falls within the configured start and end window (HH:MM formats).
+ * Supports overnight windows (e.g. 22:00 to 06:00).
+ */
+function checkIfWithinWindow(start, end) {
+  const now = new Date();
+  const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  if (start <= end) {
+    return currentTimeStr >= start && currentTimeStr <= end;
+  } else {
+    // Over midnight case
+    return currentTimeStr >= start || currentTimeStr <= end;
+  }
+}
+
+/**
+ * Sends a webhook HTTP POST request if a webhookUrl is configured.
+ */
+async function triggerWebhook(eventData) {
+  const settings = getSettings();
+  if (!settings.webhookUrl) return;
+  
+  try {
+    const response = await fetch(settings.webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        event: 'message_update',
+        timestamp: new Date().toISOString(),
+        data: eventData
+      }),
+    });
+    if (!response.ok) {
+      console.warn(`[Webhook] Received non-OK status: ${response.status} from ${settings.webhookUrl}`);
+    }
+  } catch (err) {
+    console.error('[Webhook] Failed to send webhook payload:', err.message);
+  }
 }
 
 /**
@@ -47,6 +91,24 @@ function initQueue() {
     }
 
     const campaign = campaignRes.rows[0];
+
+    // Load active settings and check time window restriction before starting
+    const settings = getSettings();
+    if (settings.sendWindowEnabled) {
+      if (!checkIfWithinWindow(settings.sendWindowStart, settings.sendWindowEnd)) {
+        await pool.query(
+          "UPDATE campaigns SET status = 'paused', updated_at = now() WHERE id = $1",
+          [campaignId]
+        );
+        await pool.query(
+          `INSERT INTO campaign_logs (campaign_id, event_type, message, created_at) 
+           VALUES ($1, 'warning', 'Outside of active sending time window. Campaign paused.', now())`,
+          [campaignId]
+        );
+        console.log(`[Queue] Campaign ${campaignId} paused: Outside active time window.`);
+        return;
+      }
+    }
 
     // Auto-update status to 'running' on start if it was not running already
     if (campaign.status !== 'running') {
@@ -88,13 +150,13 @@ function initQueue() {
     );
     const totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
 
-    // Fetch all contacts in list starting from the last_sent_index offset
+    // Fetch all contacts in list that are still queued, starting from the first one in ORDER BY id
+    // Fixed: Removed OFFSET last_sent_index to prevent skipping contacts on resume
     const contactsRes = await pool.query(
       `SELECT * FROM contacts 
        WHERE list_id = $1 AND status = 'queued' 
-       ORDER BY id ASC 
-       OFFSET $2`,
-      [campaign.list_id, campaign.last_sent_index]
+       ORDER BY id ASC`,
+      [campaign.list_id]
     );
     const contacts = contactsRes.rows;
 
@@ -129,6 +191,23 @@ function initQueue() {
       if (currentStatus === 'paused' || currentStatus === 'completed') {
         console.log(`[Queue] Campaign ${campaignId} is now ${currentStatus}. Exiting processing loop.`);
         return;
+      }
+
+      // Check time window restriction inside loop to handle crossing time boundaries
+      if (settings.sendWindowEnabled) {
+        if (!checkIfWithinWindow(settings.sendWindowStart, settings.sendWindowEnd)) {
+          await pool.query(
+            "UPDATE campaigns SET status = 'paused', updated_at = now() WHERE id = $1",
+            [campaignId]
+          );
+          await pool.query(
+            `INSERT INTO campaign_logs (campaign_id, event_type, message, created_at) 
+             VALUES ($1, 'warning', 'Outside of active sending time window. Campaign paused.', now())`,
+            [campaignId]
+          );
+          console.log(`[Queue] Campaign ${campaignId} paused: Crossed outside active time window.`);
+          return;
+        }
       }
 
       // 2. Check daily messages sent limit (sent_at::date = CURRENT_DATE)
@@ -175,6 +254,17 @@ function initQueue() {
           [contact.id]
         );
         consecutiveFails = 0;
+
+        // Trigger Webhook notification for successful send
+        await triggerWebhook({
+          campaignId,
+          contactId: contact.id,
+          phone_number: contact.phone_number,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          failure_reason: null
+        });
+
       } catch (err) {
         // 7. On failure: Update contact status to 'failed' and log
         console.error(`[Queue] Failed to send message to contact ID ${contact.id}:`, err.message);
@@ -190,6 +280,16 @@ function initQueue() {
            VALUES ($1, 'error', $2, now())`,
           [campaignId, `Failed to send to ${contact.phone_number}: ${err.message}`]
         );
+
+        // Trigger Webhook notification for failed send
+        await triggerWebhook({
+          campaignId,
+          contactId: contact.id,
+          phone_number: contact.phone_number,
+          status: 'failed',
+          sent_at: null,
+          failure_reason: err.message
+        });
       }
 
       // 8. Update campaign progress index

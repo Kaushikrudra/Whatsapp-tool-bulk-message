@@ -4,6 +4,7 @@ const { Readable } = require('stream');
 const csv = require('csv-parser');
 const xlsx = require('xlsx');
 const path = require('path');
+const { getSettings } = require('../config/settings');
 
 /**
  * Utility to extract column values from a row in a case-insensitive, space-flexible manner.
@@ -77,6 +78,9 @@ async function handleContactUpload(req, res) {
     const seenPhones = new Set();
     const validContactsToInsert = [];
 
+    const settings = getSettings();
+    const defaultCountryCode = settings ? settings.defaultCountryCode : '91';
+
     // Loop through parsed rows to validate and deduplicate
     for (const row of parsedRows) {
       const rawPhone = getColumnValue(row, ['phone_number', 'phone', 'mobile', 'contact', 'phonenumber']);
@@ -85,7 +89,7 @@ async function handleContactUpload(req, res) {
       const custom1 = getColumnValue(row, ['custom1', 'var1', 'variable1']);
       const custom2 = getColumnValue(row, ['custom2', 'var2', 'variable2']);
 
-      const normalizedPhone = normalizePhoneNumber(rawPhone);
+      const normalizedPhone = normalizePhoneNumber(rawPhone, defaultCountryCode);
 
       if (!normalizedPhone) {
         invalid++;

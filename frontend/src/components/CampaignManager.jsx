@@ -268,7 +268,7 @@ function CampaignManager() {
                   <Download size={14} /> Export Report
                 </button>
               )}
-              {(campaignDetail.status === 'draft' || campaignDetail.status === 'completed') && (
+              {(campaignDetail.status === 'draft' || campaignDetail.status === 'completed' || campaignDetail.status === 'failed' || campaignDetail.status === 'paused') && (
                 <button onClick={() => handleDelete(campaignDetail.id)} className="btn-delete-plain text-red ml-12">
                   <Trash2 size={14} /> Delete
                 </button>
@@ -579,7 +579,7 @@ function CampaignManager() {
                   </button>
 
                   {/* Delete trigger */}
-                  {(camp.status === 'draft' || camp.status === 'completed' || camp.status === 'failed') && (
+                  {(camp.status === 'draft' || camp.status === 'completed' || camp.status === 'failed' || camp.status === 'paused') && (
                     <button onClick={() => handleDelete(camp.id)} className="icon-action-btn delete" title="Delete Campaign">
                       <Trash2 size={14} />
                       <span>Delete</span>

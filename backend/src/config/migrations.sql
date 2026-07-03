@@ -59,3 +59,16 @@ CREATE TABLE IF NOT EXISTS campaign_logs (
   message TEXT,
   created_at TIMESTAMP DEFAULT now()
 );
+
+-- Create messages table for two-way chat history
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  phone_number TEXT NOT NULL,
+  direction TEXT NOT NULL, -- 'incoming' or 'outgoing'
+  message_text TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false, -- only relevant for direction='incoming'
+  timestamp TIMESTAMP DEFAULT now()
+);
+
+-- Index on phone_number for faster message history lookups
+CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone_number);

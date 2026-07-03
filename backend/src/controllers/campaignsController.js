@@ -321,9 +321,9 @@ async function deleteCampaign(req, res) {
     }
 
     const campaign = campaignRes.rows[0];
-    if (campaign.status !== 'draft' && campaign.status !== 'completed') {
+    if (campaign.status === 'running' || campaign.status === 'scheduled') {
       return res.status(400).json({
-        error: 'Cannot delete a running or paused campaign. Pause it first.'
+        error: 'Cannot delete a running or scheduled campaign. Please pause it first.'
       });
     }
 

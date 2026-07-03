@@ -9,6 +9,7 @@ import CampaignManager from './components/CampaignManager';
 import Settings from './components/Settings';
 import SystemLogs from './components/SystemLogs';
 import Login from './components/Login';
+import ChatInbox from './components/ChatInbox';
 
 // Configure Axios globally to pass cookies with requests
 axios.defaults.withCredentials = true;
@@ -310,6 +311,10 @@ function App() {
 
           {activeTab === 'templates' && (
             <TemplateManager />
+          )}
+
+          {activeTab === 'inbox' && (
+            <ChatInbox />
           )}
 
           {activeTab === 'campaigns' && (

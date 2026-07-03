@@ -153,6 +153,100 @@ async function initWhatsApp(isReconnect = false) {
     // Listen for credential changes and save them
     sock.ev.on('creds.update', saveCreds);
 
+    // Listen for messages to save to the database
+    sock.ev.on('messages.upsert', async (upsert) => {
+      const { messages: upsertMessages, type } = upsert;
+      if (type !== 'notify') return;
+
+      for (const msg of upsertMessages) {
+        const jid = msg.key.remoteJid;
+
+        // Accept both standard phone JIDs (@s.whatsapp.net) and new privacy JIDs (@lid)
+        if (!jid || (!jid.endsWith('@s.whatsapp.net') && !jid.endsWith('@lid'))) continue;
+
+        // Extract message text content using a recursive helper
+        const getMessageText = (message) => {
+          if (!message) return '';
+          if (message.conversation) return message.conversation;
+          if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+          if (message.imageMessage?.caption) return message.imageMessage.caption;
+          if (message.videoMessage?.caption) return message.videoMessage.caption;
+          if (message.ephemeralMessage?.message) return getMessageText(message.ephemeralMessage.message);
+          if (message.viewOnceMessage?.message) return getMessageText(message.viewOnceMessage.message);
+          if (message.viewOnceMessageV2?.message) return getMessageText(message.viewOnceMessageV2.message);
+          if (message.documentWithCaptionMessage?.message) return getMessageText(message.documentWithCaptionMessage.message);
+          return '';
+        };
+
+        const text = getMessageText(msg.message);
+        if (!text || !text.trim()) continue;
+
+        // Resolve phone number
+        let phoneNumber = '';
+        if (msg.key.senderPn) {
+          // If Baileys provides the sender's Phone Number JID directly
+          phoneNumber = msg.key.senderPn.split('@')[0].split(':')[0];
+        } else if (jid.endsWith('@s.whatsapp.net')) {
+          phoneNumber = jid.split('@')[0].split(':')[0];
+        } else if (jid.endsWith('@lid')) {
+          let resolvedJid = null;
+          
+          if (sock.signalRepository?.lidMapping?.getPNForLID) {
+            try {
+              resolvedJid = await sock.signalRepository.lidMapping.getPNForLID(jid);
+            } catch (err) {
+              console.warn('[Connection] Error calling getPNForLID repository lookup:', err.message);
+            }
+          }
+
+          if (resolvedJid) {
+            phoneNumber = resolvedJid.split('@')[0].split(':')[0];
+            console.log(`[Connection] Successfully resolved LID ${jid} to Phone Number: ${phoneNumber}`);
+          } else {
+            phoneNumber = jid.split('@')[0].split(':')[0];
+            console.warn(`[Connection] Fallback occurred: Could not resolve LID "${jid}" to PN. Storing raw LID identifier: ${phoneNumber}`);
+          }
+        }
+
+        // If it is fromMe, it's an outgoing message sent from the connected phone
+        const isFromMe = !!msg.key.fromMe;
+        const direction = isFromMe ? 'outgoing' : 'incoming';
+        const isRead = isFromMe ? true : false;
+
+        try {
+          const { pool } = require('../config/db');
+          await pool.query(
+            "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, $2, $3, $4, now())",
+            [phoneNumber, direction, text.trim(), isRead]
+          );
+          console.log(`[Connection] Saved message to database. PhoneNumber: ${phoneNumber}, Direction: ${direction}`);
+          
+          // Trigger Webhook if configured (only for incoming messages)
+          if (!isFromMe) {
+            const { getSettings } = require('../config/settings');
+            const settings = getSettings();
+            if (settings.webhookUrl) {
+              fetch(settings.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  event: 'message_received',
+                  timestamp: new Date().toISOString(),
+                  data: {
+                    phone_number: phoneNumber,
+                    message_text: text.trim(),
+                    direction: 'incoming'
+                  }
+                })
+              }).catch(webhookErr => console.error('[Webhook] Failed to dispatch received message alert:', webhookErr.message));
+            }
+          }
+        } catch (err) {
+          console.error('[Connection] Failed to log WhatsApp message:', err.message);
+        }
+      }
+    });
+
   } catch (error) {
     console.error('Error during WhatsApp socket initialization:', error);
     connectionStatus = 'disconnected';
