@@ -1,6 +1,6 @@
 const Bull = require('bull');
 const { pool } = require('../config/db');
-const { sendTextMessage } = require('../whatsapp/connection');
+const { sendTextMessage, sendMediaMessage } = require('../whatsapp/connection');
 const { getSettings } = require('../config/settings');
 
 // Initialize the Bull queue backed by local Redis (redis://localhost:6379)
@@ -124,7 +124,7 @@ function initQueue() {
 
     // Fetch the template details
     const templateRes = await pool.query(
-      'SELECT body FROM templates WHERE id = $1',
+      'SELECT body, media_url, media_type FROM templates WHERE id = $1',
       [campaign.template_id]
     );
 
@@ -141,7 +141,7 @@ function initQueue() {
       return;
     }
 
-    const templateBody = templateRes.rows[0].body;
+    const { body: templateBody, media_url: mediaUrl, media_type: mediaType } = templateRes.rows[0];
 
     // Fetch the total number of contacts in this campaign's list to determine size limits (FR-20)
     const totalCountRes = await pool.query(
@@ -246,7 +246,11 @@ function initQueue() {
       try {
         // 5. Send message via WhatsApp connection JID (phoneNumber@s.whatsapp.net)
         const recipientJid = `${contact.phone_number}@s.whatsapp.net`;
-        await sendTextMessage(recipientJid, resolvedMessage);
+        if (mediaUrl && mediaType && mediaType !== 'none') {
+          await sendMediaMessage(recipientJid, mediaUrl, mediaType, resolvedMessage);
+        } else {
+          await sendTextMessage(recipientJid, resolvedMessage);
+        }
 
         // 6. On success: Update contact status to 'sent'
         await pool.query(

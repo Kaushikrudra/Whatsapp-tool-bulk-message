@@ -6,7 +6,7 @@ const { pool } = require('../config/db');
  */
 async function createTemplate(req, res) {
   try {
-    const { name, body } = req.body;
+    const { name, body, media_url = null, media_type = 'none' } = req.body;
 
     // Validation: name and body must be present and non-empty
     if (!name || !name.trim()) {
@@ -17,10 +17,10 @@ async function createTemplate(req, res) {
     }
 
     const result = await pool.query(
-      `INSERT INTO templates (name, body, created_at, updated_at)
-       VALUES ($1, $2, now(), now())
+      `INSERT INTO templates (name, body, media_url, media_type, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, now(), now())
        RETURNING *`,
-      [name.trim(), body.trim()]
+      [name.trim(), body.trim(), media_url, media_type]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -76,7 +76,7 @@ async function getTemplateById(req, res) {
 async function updateTemplate(req, res) {
   try {
     const templateId = req.params.id;
-    const { name, body } = req.body;
+    const { name, body, media_url = null, media_type = 'none' } = req.body;
 
     // Validation
     if (!name || !name.trim()) {
@@ -88,10 +88,10 @@ async function updateTemplate(req, res) {
 
     const result = await pool.query(
       `UPDATE templates
-       SET name = $1, body = $2, updated_at = now()
-       WHERE id = $3
+       SET name = $1, body = $2, media_url = $3, media_type = $4, updated_at = now()
+       WHERE id = $5
        RETURNING *`,
-      [name.trim(), body.trim(), templateId]
+      [name.trim(), body.trim(), media_url, media_type, templateId]
     );
 
     if (result.rows.length === 0) {

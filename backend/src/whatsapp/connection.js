@@ -309,16 +309,35 @@ async function logoutWhatsApp() {
   initWhatsApp();
 }
 
-/**
- * Sends a plain text message to a specific WhatsApp JID using the active socket.
- * @param {string} jid The WhatsApp JID (e.g. "1234567890@s.whatsapp.net")
- * @param {string} text The message text content
- */
 async function sendTextMessage(jid, text) {
   if (!sock || connectionStatus !== 'connected') {
     throw new Error('WhatsApp not connected');
   }
   return await sock.sendMessage(jid, { text: text });
+}
+
+/**
+ * Sends a media message (image, pdf, video) to a specific WhatsApp JID using the active socket.
+ */
+async function sendMediaMessage(jid, mediaUrl, mediaType, captionText) {
+  if (!sock || connectionStatus !== 'connected') {
+    throw new Error('WhatsApp not connected');
+  }
+
+  if (mediaType === 'image') {
+    return await sock.sendMessage(jid, { image: { url: mediaUrl }, caption: captionText });
+  } else if (mediaType === 'pdf') {
+    return await sock.sendMessage(jid, { 
+      document: { url: mediaUrl }, 
+      mimetype: 'application/pdf', 
+      fileName: 'document.pdf', 
+      caption: captionText 
+    });
+  } else if (mediaType === 'video') {
+    return await sock.sendMessage(jid, { video: { url: mediaUrl }, caption: captionText });
+  } else {
+    return await sock.sendMessage(jid, { text: captionText });
+  }
 }
 
 module.exports = {
@@ -327,4 +346,5 @@ module.exports = {
   getQRCode,
   logoutWhatsApp,
   sendTextMessage,
+  sendMediaMessage,
 };

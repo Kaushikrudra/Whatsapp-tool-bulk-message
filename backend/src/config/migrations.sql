@@ -72,3 +72,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- Index on phone_number for faster message history lookups
 CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone_number);
+
+-- Alter templates table to support media attachments
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'none';

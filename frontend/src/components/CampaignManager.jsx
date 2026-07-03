@@ -643,7 +643,7 @@ function CampaignManager() {
                 </div>
 
                 {/* Select Message Template */}
-                <div className="form-group mt-16">
+                <div className="form-group mt-16 text-left">
                   <label htmlFor="select-template" className="form-label">Select Message Template</label>
                   <select 
                     id="select-template" 
@@ -659,6 +659,36 @@ function CampaignManager() {
                       </option>
                     ))}
                   </select>
+
+                  {/* Media Attached Indicator */}
+                  {templates.find(t => String(t.id) === String(templateId))?.media_url && (
+                    <div className="media-indicator-card mt-8" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '12.5px',
+                      color: 'var(--text-secondary)'
+                    }}>
+                      <span style={{ fontSize: '14px' }}>📎</span>
+                      <div style={{ textAlign: 'left', minWidth: 0 }}>
+                        <span>Attached Media: </span>
+                        <strong className="text-teal" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                          [{templates.find(t => String(t.id) === String(templateId))?.media_type}]
+                        </strong>
+                        <span style={{ 
+                          marginLeft: '6px', fontSize: '12px', opacity: '0.8', 
+                          display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', 
+                          whiteSpace: 'nowrap', maxWidth: '200px', verticalAlign: 'bottom' 
+                        }} title={templates.find(t => String(t.id) === String(templateId))?.media_url.split('/').pop()}>
+                          {templates.find(t => String(t.id) === String(templateId))?.media_url.split('/').pop().substring(0, 25)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Schedule datetime picker */}

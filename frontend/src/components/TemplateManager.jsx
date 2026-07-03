@@ -12,8 +12,14 @@ function TemplateManager() {
   // Form State
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState('none');
+  const [mediaFileName, setMediaFileName] = useState('');
+  
   const [editingId, setEditingId] = useState(null); // stores template ID if editing
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch all templates
   const fetchTemplates = async () => {
@@ -33,6 +39,45 @@ function TemplateManager() {
   useEffect(() => {
     fetchTemplates();
   }, []);
+
+  // Handle uploading media attachments to Supabase Storage
+  const handleMediaUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/media/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+
+      setMediaUrl(response.data.publicUrl);
+      setMediaType(response.data.mediaType);
+      setMediaFileName(file.name);
+    } catch (err) {
+      console.error('Error uploading media:', err);
+      alert(err.response?.data?.error || 'Failed to upload media file.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Remove attached media
+  const handleRemoveMedia = () => {
+    setMediaUrl('');
+    setMediaType('none');
+    setMediaFileName('');
+  };
 
   // Insert variable tag at cursor position inside body textarea
   const insertVariable = (variable) => {
@@ -85,18 +130,25 @@ function TemplateManager() {
         await axios.put(`${BACKEND_URL}/${editingId}`, {
           name: name.trim(),
           body: body.trim(),
+          media_url: mediaUrl || null,
+          media_type: mediaType || 'none',
         });
       } else {
         // Create template
         await axios.post(BACKEND_URL, {
           name: name.trim(),
           body: body.trim(),
+          media_url: mediaUrl || null,
+          media_type: mediaType || 'none',
         });
       }
 
       // Reset form
       setName('');
       setBody('');
+      setMediaUrl('');
+      setMediaType('none');
+      setMediaFileName('');
       setEditingId(null);
       await fetchTemplates();
     } catch (err) {
@@ -111,6 +163,9 @@ function TemplateManager() {
   const handleEditInit = (template) => {
     setName(template.name);
     setBody(template.body);
+    setMediaUrl(template.media_url || '');
+    setMediaType(template.media_type || 'none');
+    setMediaFileName(template.media_url ? template.media_url.split('/').pop().substring(0, 30) : '');
     setEditingId(template.id);
     
     // Scroll smoothly to composer
@@ -121,6 +176,9 @@ function TemplateManager() {
   const handleCancelEdit = () => {
     setName('');
     setBody('');
+    setMediaUrl('');
+    setMediaType('none');
+    setMediaFileName('');
     setEditingId(null);
   };
 
@@ -162,7 +220,7 @@ function TemplateManager() {
       <div className="card">
         <header className="card-header border-none pb-0 text-left">
           <h2>{editingId ? 'Edit Message Template' : 'Create Message Template'}</h2>
-          <p className="subtitle">Compose message templates using customized variables and formatting</p>
+          <p className="subtitle">Compose message templates using customized variables, formatting, and media attachments</p>
         </header>
 
         <main className="card-body">
@@ -171,7 +229,7 @@ function TemplateManager() {
               
               {/* Left Column: Form Inputs */}
               <div className="composer-inputs">
-                <div className="form-group">
+                <div className="form-group text-left">
                   <label htmlFor="template-name-input" className="form-label">
                     Template Name
                   </label>
@@ -186,10 +244,10 @@ function TemplateManager() {
                   />
                 </div>
 
-                <div className="form-group mt-16">
+                <div className="form-group mt-16 text-left">
                   <div className="label-row">
                     <label htmlFor="template-body-textarea" className="form-label">
-                      Message Body
+                      Message Body / Caption
                     </label>
                     <span className={`char-counter ${body.length > 1000 ? 'warning' : ''}`}>
                       {body.length} / 1000 characters {body.length > 1000 && '(Warning: High length)'}
@@ -252,6 +310,101 @@ function TemplateManager() {
                     </code>
                   </div>
                 </div>
+
+                {/* Attach Media Section */}
+                <div className="form-group mt-20 text-left">
+                  <label className="form-label">Attach Media (Optional)</label>
+                  <p className="subtitle" style={{ fontSize: '12px', marginTop: '-4px', marginBottom: '8px' }}>
+                    Upload image (JPG/PNG), document (PDF), or video (MP4) to send with this template
+                  </p>
+                  
+                  {!mediaUrl ? (
+                    <div className="media-upload-zone" style={{
+                      border: '2px dashed var(--border-color)',
+                      borderRadius: '8px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      background: 'var(--bg-primary)',
+                      cursor: 'pointer',
+                      position: 'relative'
+                    }}>
+                      <input 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/jpg, application/pdf, video/mp4"
+                        onChange={handleMediaUpload}
+                        disabled={uploading}
+                        style={{
+                          position: 'absolute',
+                          top: 0, left: 0, width: '100%', height: '100%',
+                          opacity: 0, cursor: 'pointer'
+                        }}
+                      />
+                      {uploading ? (
+                        <div>
+                          <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
+                          <p style={{ fontSize: '13px', margin: 0 }}>Uploading file... {uploadProgress}%</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: '13px', margin: 0, color: 'var(--text-secondary)' }}>
+                            Click to browse or drag & drop files here
+                          </p>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            Supported: JPG, PNG, PDF, MP4 (Max 50MB)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="media-attached-preview" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border-color)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                        {mediaType === 'image' && (
+                          <img 
+                            src={mediaUrl} 
+                            alt="Attached Thumbnail" 
+                            style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-color)' }} 
+                          />
+                        )}
+                        <div style={{ minWidth: 0, textAlign: 'left' }}>
+                          <span className={`status-pill ${mediaType}`} style={{
+                            display: 'inline-block',
+                            fontSize: '9px',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            marginBottom: '4px',
+                            lineHeight: '1',
+                            background: mediaType === 'image' ? 'rgba(20, 184, 166, 0.1)' : mediaType === 'pdf' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                            color: mediaType === 'image' ? 'var(--accent-teal)' : mediaType === 'pdf' ? '#3b82f6' : '#f59e0b'
+                          }}>
+                            {mediaType}
+                          </span>
+                          <p style={{ fontSize: '13px', margin: 0, fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }} title={mediaFileName}>
+                            {mediaFileName || 'Attached media file'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        type="button" 
+                        onClick={handleRemoveMedia} 
+                        className="btn-delete"
+                        style={{ padding: '6px 12px' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Column: Live Preview */}
@@ -261,7 +414,32 @@ function TemplateManager() {
                     <Sparkles size={16} className="text-teal" />
                     <span>Live Message Preview</span>
                   </div>
-                  <div className="whatsapp-chat-bubble">
+                  <div className="whatsapp-chat-bubble" style={{ textAlign: 'left' }}>
+                    {mediaUrl && mediaType === 'image' && (
+                      <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden' }}>
+                        <img src={mediaUrl} alt="Preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    {mediaUrl && mediaType === 'pdf' && (
+                      <div className="bubble-media-preview" style={{ 
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', 
+                        background: 'rgba(0,0,0,0.03)', borderRadius: '6px', marginBottom: '8px',
+                        border: '1px solid rgba(0,0,0,0.05)', textAlign: 'left'
+                      }}>
+                        <FileText size={24} style={{ color: '#ef4444' }} />
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: '13px', margin: 0, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {mediaFileName || 'document.pdf'}
+                          </p>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PDF Document</span>
+                        </div>
+                      </div>
+                    )}
+                    {mediaUrl && mediaType === 'video' && (
+                      <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', background: '#000', maxHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <video src={mediaUrl} controls style={{ width: '100%', maxHeight: '180px' }} />
+                      </div>
+                    )}
                     <p className="preview-text-render">{getPreviewText(body)}</p>
                     <span className="chat-bubble-time">
                       {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -276,11 +454,11 @@ function TemplateManager() {
             </div>
 
             {/* Actions Buttons Row */}
-            <div className="composer-actions mt-24">
+            <div className="composer-actions mt-24 text-left">
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={saving}
+                disabled={saving || uploading}
               >
                 <Save size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
                 {saving ? 'Saving...' : editingId ? 'Update Template' : 'Save Template'}
@@ -323,9 +501,22 @@ function TemplateManager() {
               {templates.map((template) => (
                 <div key={template.id} className="template-item-card">
                   <div className="template-item-header">
-                    <div className="template-icon-title">
+                    <div className="template-icon-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                       <FileText size={18} className="text-teal" />
                       <h4>{template.name}</h4>
+                      {template.media_type && template.media_type !== 'none' && (
+                        <span className={`status-pill ${template.media_type}`} style={{
+                          fontSize: '8px',
+                          fontWeight: '800',
+                          textTransform: 'uppercase',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: template.media_type === 'image' ? 'rgba(20, 184, 166, 0.1)' : template.media_type === 'pdf' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          color: template.media_type === 'image' ? 'var(--accent-teal)' : template.media_type === 'pdf' ? '#3b82f6' : '#f59e0b'
+                        }}>
+                          📎 {template.media_type}
+                        </span>
+                      )}
                     </div>
                     <div className="template-item-actions">
                       <button
