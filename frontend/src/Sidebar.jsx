@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare } from 'lucide-react';
+import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare, BarChart2 } from 'lucide-react';
 
 function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -10,6 +10,7 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
       label: 'OVERVIEW',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: Home },
+        { id: 'analytics', label: 'Analytics', icon: BarChart2 },
         { id: 'inbox', label: 'Chat Inbox', icon: MessageSquare }
       ]
     },
