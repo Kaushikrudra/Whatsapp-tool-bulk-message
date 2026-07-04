@@ -88,4 +88,101 @@ router.delete('/lists/:id', async (req, res) => {
   }
 });
 
+// GET /api/contacts/tags - Get all distinct tags currently in the database
+router.get('/tags', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT DISTINCT unnest(tags) as tag FROM contacts WHERE tags IS NOT NULL ORDER BY tag ASC');
+    const tags = result.rows.map(r => r.tag);
+    return res.json(tags);
+  } catch (error) {
+    console.error('Error fetching distinct tags:', error);
+    return res.status(500).json({ error: 'Failed to retrieve tags' });
+  }
+});
+
+// PUT /api/contacts/:id/tags - Update tags for a specific contact
+router.put('/:id/tags', async (req, res) => {
+  try {
+    const contactId = req.params.id;
+    const { tags } = req.body; // Expects an array of strings, e.g. ["hot", "vip"]
+    
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ error: 'Tags parameter must be a string array' });
+    }
+
+    // Clean tags: trim, lowercase, remove duplicates/empty strings
+    const cleanedTags = Array.from(new Set(
+      tags.map(t => String(t).trim().toLowerCase()).filter(t => t.length > 0)
+    ));
+
+    const result = await pool.query(
+      'UPDATE contacts SET tags = $1 WHERE id = $2 RETURNING *',
+      [cleanedTags, contactId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating contact tags:', error);
+    return res.status(500).json({ error: 'Failed to update contact tags' });
+  }
+});
+
+// GET /api/contacts - Global search & filter contacts (by tag or search term)
+router.get('/', async (req, res) => {
+  try {
+    const { tag, search, page = 1 } = req.query;
+    const limit = 50;
+    const offset = (page - 1) * limit;
+
+    let queryText = 'SELECT * FROM contacts WHERE 1=1';
+    let countQueryText = 'SELECT COUNT(*) FROM contacts WHERE 1=1';
+    let queryValues = [];
+    let countValues = [];
+    let paramIndex = 1;
+
+    if (tag) {
+      queryText += ` AND $${paramIndex} = ANY(tags)`;
+      countQueryText += ` AND $${paramIndex} = ANY(tags)`;
+      queryValues.push(tag);
+      countValues.push(tag);
+      paramIndex++;
+    }
+
+    if (search) {
+      queryText += ` AND (name ILIKE $${paramIndex} OR phone_number ILIKE $${paramIndex} OR company ILIKE $${paramIndex})`;
+      countQueryText += ` AND (name ILIKE $${paramIndex} OR phone_number ILIKE $${paramIndex} OR company ILIKE $${paramIndex})`;
+      queryValues.push(`%${search}%`);
+      countValues.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    // Get total matches count
+    const countRes = await pool.query(countQueryText, countValues);
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    // Get paginated rows
+    queryText += ` ORDER BY id DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryValues.push(limit, offset);
+    
+    const result = await pool.query(queryText, queryValues);
+
+    return res.json({
+      contacts: result.rows,
+      pagination: {
+        page: parseInt(page, 10),
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error searching contacts:', error);
+    return res.status(500).json({ error: 'Failed to query contacts' });
+  }
+});
+
 module.exports = router;

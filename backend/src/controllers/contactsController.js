@@ -70,6 +70,11 @@ async function handleContactUpload(req, res) {
       return res.status(400).json({ error: 'Unsupported file type. Only .csv and .xlsx files are supported.' });
     }
 
+    // Parse default tags from body (comma separated)
+    const defaultTags = req.body.tags
+      ? req.body.tags.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0)
+      : [];
+
     let total = parsedRows.length;
     let valid = 0;
     let invalid = 0;
@@ -88,6 +93,14 @@ async function handleContactUpload(req, res) {
       const company = getColumnValue(row, ['company', 'organization', 'org']);
       const custom1 = getColumnValue(row, ['custom1', 'var1', 'variable1']);
       const custom2 = getColumnValue(row, ['custom2', 'var2', 'variable2']);
+      
+      // Look for a tag/tags column in row
+      const rowTagsRaw = getColumnValue(row, ['tags', 'tag', 'segment', 'segments']);
+      const rowTags = rowTagsRaw
+        ? String(rowTagsRaw).split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0)
+        : [];
+      
+      const combinedTags = Array.from(new Set([...defaultTags, ...rowTags]));
 
       const normalizedPhone = normalizePhoneNumber(rawPhone, defaultCountryCode);
 
@@ -110,6 +123,7 @@ async function handleContactUpload(req, res) {
         company: company ? String(company).trim() : null,
         custom1: custom1 ? String(custom1).trim() : null,
         custom2: custom2 ? String(custom2).trim() : null,
+        tags: combinedTags
       });
     }
 
@@ -140,20 +154,21 @@ async function handleContactUpload(req, res) {
         let paramIndex = 1;
 
         for (const contact of batch) {
-          valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5})`);
+          valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`);
           queryValues.push(
             listId,
             contact.phone_number,
             contact.name,
             contact.company,
             contact.custom1,
-            contact.custom2
+            contact.custom2,
+            contact.tags
           );
-          paramIndex += 6;
+          paramIndex += 7;
         }
 
         const insertQueryText = `
-          INSERT INTO contacts (list_id, phone_number, name, company, custom1, custom2)
+          INSERT INTO contacts (list_id, phone_number, name, company, custom1, custom2, tags)
           VALUES ${valuePlaceholders.join(', ')}
         `;
         await client.query(insertQueryText, queryValues);

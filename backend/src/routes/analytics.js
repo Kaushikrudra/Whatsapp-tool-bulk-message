@@ -190,4 +190,35 @@ router.get('/wow-trends', async (req, res) => {
   }
 });
 
+// GET /api/analytics/segments - Get message statistics grouped by tag segments
+router.get('/segments', async (req, res) => {
+  try {
+    const segmentsRes = await pool.query(`
+      SELECT 
+        unnest(tags) as tag,
+        COUNT(*) as total_sent,
+        COUNT(*) FILTER (WHERE status = 'sent') as successful,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed,
+        ROUND(COUNT(*) FILTER (WHERE status = 'sent')::numeric / COUNT(*) * 100, 2) as success_rate
+      FROM contacts
+      WHERE sent_at IS NOT NULL AND tags IS NOT NULL AND cardinality(tags) > 0
+      GROUP BY tag
+      ORDER BY total_sent DESC
+    `);
+
+    const formattedSegments = segmentsRes.rows.map(row => ({
+      tag: row.tag,
+      total_sent: parseInt(row.total_sent || 0, 10),
+      successful: parseInt(row.successful || 0, 10),
+      failed: parseInt(row.failed || 0, 10),
+      success_rate: parseFloat(row.success_rate || 0),
+    }));
+
+    return res.json(formattedSegments);
+  } catch (err) {
+    console.error('Error fetching segment-wise analytics:', err);
+    return res.status(500).json({ error: 'Failed to fetch segment-wise metrics.' });
+  }
+});
+
 module.exports = router;

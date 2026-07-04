@@ -143,22 +143,39 @@ function initQueue() {
 
     const { body: templateBody, media_url: mediaUrl, media_type: mediaType } = templateRes.rows[0];
 
-    // Fetch the total number of contacts in this campaign's list to determine size limits (FR-20)
-    const totalCountRes = await pool.query(
-      'SELECT COUNT(*) FROM contacts WHERE list_id = $1',
-      [campaign.list_id]
-    );
-    const totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
+    // Fetch the total number of contacts in this campaign's target to determine size limits (FR-20)
+    let totalContactsInCampaign = 0;
+    let contacts = [];
 
-    // Fetch all contacts in list that are still queued, starting from the first one in ORDER BY id
-    // Fixed: Removed OFFSET last_sent_index to prevent skipping contacts on resume
-    const contactsRes = await pool.query(
-      `SELECT * FROM contacts 
-       WHERE list_id = $1 AND status = 'queued' 
-       ORDER BY id ASC`,
-      [campaign.list_id]
-    );
-    const contacts = contactsRes.rows;
+    if (campaign.target_type === 'tag') {
+      const totalCountRes = await pool.query(
+        'SELECT COUNT(*) FROM contacts WHERE tags && $1::TEXT[]',
+        [campaign.target_tags]
+      );
+      totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
+
+      const contactsRes = await pool.query(
+        `SELECT * FROM contacts 
+         WHERE tags && $1::TEXT[] AND status = 'queued' 
+         ORDER BY id ASC`,
+        [campaign.target_tags]
+      );
+      contacts = contactsRes.rows;
+    } else {
+      const totalCountRes = await pool.query(
+        'SELECT COUNT(*) FROM contacts WHERE list_id = $1',
+        [campaign.list_id]
+      );
+      totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
+
+      const contactsRes = await pool.query(
+        `SELECT * FROM contacts 
+         WHERE list_id = $1 AND status = 'queued' 
+         ORDER BY id ASC`,
+        [campaign.list_id]
+      );
+      contacts = contactsRes.rows;
+    }
 
     if (contacts.length === 0) {
       // All contacts already processed
@@ -254,8 +271,8 @@ function initQueue() {
 
         // 6. On success: Update contact status to 'sent'
         await pool.query(
-          "UPDATE contacts SET status = 'sent', sent_at = now(), failure_reason = NULL WHERE id = $1",
-          [contact.id]
+          "UPDATE contacts SET status = 'sent', sent_at = now(), campaign_id = $2, failure_reason = NULL WHERE id = $1",
+          [contact.id, campaignId]
         );
         consecutiveFails = 0;
 
@@ -274,8 +291,8 @@ function initQueue() {
         console.error(`[Queue] Failed to send message to contact ID ${contact.id}:`, err.message);
 
         await pool.query(
-          "UPDATE contacts SET status = 'failed', failure_reason = $1 WHERE id = $2",
-          [err.message, contact.id]
+          "UPDATE contacts SET status = 'failed', campaign_id = $2, failure_reason = $1 WHERE id = $3",
+          [err.message, campaignId, contact.id]
         );
         consecutiveFails++;
 

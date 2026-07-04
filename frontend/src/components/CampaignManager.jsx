@@ -33,6 +33,9 @@ function CampaignManager() {
   const [listId, setListId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [targetType, setTargetType] = useState('list'); // 'list' | 'tag'
+  const [targetTags, setTargetTags] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
   
   // Advanced settings state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -111,6 +114,20 @@ function CampaignManager() {
     return () => clearInterval(interval);
   }, [campaigns, selectedCampaignId, detailPage]);
 
+  useEffect(() => {
+    if (showCreateModal) {
+      const fetchAvailableTags = async () => {
+        try {
+          const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contacts/tags`);
+          setAvailableTags(response.data);
+        } catch (err) {
+          console.error('Error fetching distinct tags:', err);
+        }
+      };
+      fetchAvailableTags();
+    }
+  }, [showCreateModal]);
+
   // Handle Campaign Detail View pagination
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= (detailPagination.totalPages || 1)) {
@@ -123,19 +140,22 @@ function CampaignManager() {
     e.preventDefault();
 
     if (!name.trim()) return alert('Please enter a campaign name.');
-    if (!listId) return alert('Please select a contact list.');
+    if (targetType === 'list' && !listId) return alert('Please select a contact list.');
+    if (targetType === 'tag' && targetTags.length === 0) return alert('Please select at least one target tag segment.');
     if (!templateId) return alert('Please select a message template.');
 
     try {
       await axios.post(`${BACKEND_URL}/campaigns`, {
         name: name.trim(),
         template_id: parseInt(templateId, 10),
-        list_id: parseInt(listId, 10),
+        list_id: targetType === 'list' ? parseInt(listId, 10) : null,
         scheduled_at: scheduledAt || null,
         min_delay_seconds: parseInt(minDelay, 10),
         max_delay_seconds: parseInt(maxDelay, 10),
         daily_limit: parseInt(dailyLimit, 10),
-        consecutive_fail_threshold: parseInt(consecutiveFailThreshold, 10)
+        consecutive_fail_threshold: parseInt(consecutiveFailThreshold, 10),
+        target_type: targetType,
+        target_tags: targetType === 'tag' ? targetTags : [],
       });
 
       // Reset form
@@ -143,6 +163,8 @@ function CampaignManager() {
       setListId('');
       setTemplateId('');
       setScheduledAt('');
+      setTargetType('list');
+      setTargetTags([]);
       setMinDelay(3);
       setMaxDelay(8);
       setDailyLimit(200);
@@ -306,8 +328,14 @@ function CampaignManager() {
                         <span className="metadata-value"><strong>{campaignDetail.template_name || 'N/A'}</strong></span>
                       </div>
                       <div className="metadata-item">
-                        <span className="metadata-label">Recipient List:</span>
-                        <span className="metadata-value"><strong>{campaignDetail.list_name || 'N/A'}</strong></span>
+                        <span className="metadata-label">Recipient Target:</span>
+                        <span className="metadata-value">
+                          {campaignDetail.target_type === 'tag' ? (
+                            <>Tags: <strong style={{ color: 'var(--accent-teal)' }}>{campaignDetail.target_tags ? campaignDetail.target_tags.join(', ') : 'N/A'}</strong></>
+                          ) : (
+                            <strong>List: {campaignDetail.list_name || 'N/A'}</strong>
+                          )}
+                        </span>
                       </div>
                       <div className="metadata-item">
                         <span className="metadata-label">Progress:</span>
@@ -532,7 +560,14 @@ function CampaignManager() {
                   </div>
 
                   <div className="campaign-details-small mt-12">
-                    <p><Users size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> List: <strong>{camp.list_name}</strong></p>
+                    <p>
+                      <Users size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> 
+                      {camp.target_type === 'tag' ? (
+                        <>Tags: <strong style={{ color: 'var(--accent-teal)' }}>{camp.target_tags ? camp.target_tags.join(', ') : 'N/A'}</strong></>
+                      ) : (
+                        <>List: <strong>{camp.list_name || 'N/A'}</strong></>
+                      )}
+                    </p>
                     <p><FileText size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Template: <strong>{camp.template_name}</strong></p>
                   </div>
                 </div>
@@ -623,24 +658,98 @@ function CampaignManager() {
                   />
                 </div>
 
-                {/* Select Contact List */}
-                <div className="form-group mt-16">
-                  <label htmlFor="select-list" className="form-label">Select Contact List</label>
-                  <select 
-                    id="select-list" 
-                    className="file-input select-input" 
-                    value={listId}
-                    onChange={(e) => setListId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Choose Contact List --</option>
-                    {lists.map(list => (
-                      <option key={list.id} value={list.id}>
-                        {list.name} ({list.valid_count} valid contacts)
-                      </option>
-                    ))}
-                  </select>
+                {/* Targeting Method */}
+                <div className="form-group mt-16 text-left">
+                  <label className="form-label" style={{ fontWeight: '600', fontSize: '13px' }}>Targeting Method</label>
+                  <div style={{ display: 'flex', gap: '20px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                      <input 
+                        type="radio" 
+                        name="targetType" 
+                        value="list" 
+                        checked={targetType === 'list'} 
+                        onChange={() => setTargetType('list')} 
+                      />
+                      Target by Contact List
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                      <input 
+                        type="radio" 
+                        name="targetType" 
+                        value="tag" 
+                        checked={targetType === 'tag'} 
+                        onChange={() => setTargetType('tag')} 
+                      />
+                      Target by Segments (Tags)
+                    </label>
+                  </div>
                 </div>
+
+                {/* Target by List */}
+                {targetType === 'list' ? (
+                  <div className="form-group mt-16 text-left">
+                    <label htmlFor="select-list" className="form-label">Select Contact List</label>
+                    <select 
+                      id="select-list" 
+                      className="file-input select-input" 
+                      value={listId}
+                      onChange={(e) => setListId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Choose Contact List --</option>
+                      {lists.map(list => (
+                        <option key={list.id} value={list.id}>
+                          {list.name} ({list.valid_count} valid contacts)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  /* Target by Tags */
+                  <div className="form-group mt-16 text-left">
+                    <label className="form-label">Select Target Tags (OR union)</label>
+                    {availableTags.length === 0 ? (
+                      <p style={{ margin: '6px 0 0 0', fontSize: '12.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No tags found in database. Add tags to contacts during upload first.
+                      </p>
+                    ) : (
+                      <div style={{ 
+                        display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px', 
+                        padding: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '120px', overflowY: 'auto' 
+                      }}>
+                        {availableTags.map(tag => {
+                          const isChecked = targetTags.includes(tag);
+                          return (
+                            <label 
+                              key={tag} 
+                              style={{ 
+                                display: 'inline-flex', alignItems: 'center', gap: '6px', 
+                                padding: '4px 10px', borderRadius: '20px', border: `1px solid ${isChecked ? 'var(--accent-teal)' : 'var(--border-color)'}`,
+                                background: isChecked ? 'rgba(20, 184, 166, 0.05)' : 'transparent',
+                                color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer', userSelect: 'none', transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <input 
+                                type="checkbox" 
+                                value={tag} 
+                                checked={isChecked} 
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setTargetTags([...targetTags, tag]);
+                                  } else {
+                                    setTargetTags(targetTags.filter(t => t !== tag));
+                                  }
+                                }}
+                                style={{ display: 'none' }}
+                              />
+                              {tag}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Select Message Template */}
                 <div className="form-group mt-16 text-left">

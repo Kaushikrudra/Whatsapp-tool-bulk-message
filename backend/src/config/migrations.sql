@@ -76,3 +76,11 @@ CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone_number);
 -- Alter templates table to support media attachments
 ALTER TABLE templates ADD COLUMN IF NOT EXISTS media_url TEXT;
 ALTER TABLE templates ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'none';
+
+-- Alter contacts table to support tags
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+
+-- Alter campaigns table to support tag-based targeting
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'list';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_tags TEXT[] DEFAULT '{}';
+ALTER TABLE campaigns ALTER COLUMN list_id DROP NOT NULL;

@@ -18,6 +18,7 @@ function AnalyticsDashboard() {
   const [bestTime, setBestTime] = useState([]);
   const [comparison, setComparison] = useState([]);
   const [wowTrends, setWowTrends] = useState(null);
+  const [segments, setSegments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,12 +28,13 @@ function AnalyticsDashboard() {
       setLoading(true);
       setError(null);
 
-      const [summaryRes, timelineRes, bestTimeRes, comparisonRes, wowRes] = await Promise.all([
+      const [summaryRes, timelineRes, bestTimeRes, comparisonRes, wowRes, segmentsRes] = await Promise.all([
         axios.get(`${BACKEND_URL}/summary`),
         axios.get(`${BACKEND_URL}/delivery-timeline?range=${range}`),
         axios.get(`${BACKEND_URL}/best-time`),
         axios.get(`${BACKEND_URL}/comparison`),
-        axios.get(`${BACKEND_URL}/wow-trends`)
+        axios.get(`${BACKEND_URL}/wow-trends`),
+        axios.get(`${BACKEND_URL}/segments`)
       ]);
 
       setSummary(summaryRes.data);
@@ -40,6 +42,7 @@ function AnalyticsDashboard() {
       setBestTime(bestTimeRes.data);
       setComparison(comparisonRes.data);
       setWowTrends(wowRes.data);
+      setSegments(segmentsRes.data);
     } catch (err) {
       console.error('Error fetching analytics dashboard:', err);
       setError('Failed to fetch analytics metrics. Please ensure database and Redis services are active.');
@@ -408,6 +411,60 @@ function AnalyticsDashboard() {
                     </td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
                       {new Date(item.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* SEGMENT PERFORMANCE ANALYTICS CARD */}
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: '20px', marginTop: '24px' }}>
+        <header className="card-header border-none pb-0" style={{ padding: '0 0 16px 0', textAlign: 'left' }}>
+          <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '700' }}>Segment Performance Breakdown</h3>
+          <p className="subtitle" style={{ margin: '2px 0 0 0', fontSize: '12px' }}>Transmission volumes and success rates grouped by contact tags</p>
+        </header>
+
+        <div style={{ overflowX: 'auto' }}>
+          {segments.length === 0 ? (
+            <p className="empty-message" style={{ margin: '20px 0' }}>No tag segments found. Apply tags to contacts and send messages to build segment insights.</p>
+          ) : (
+            <table className="contacts-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                  <th style={{ padding: '12px 16px' }}>Segment Tag</th>
+                  <th style={{ padding: '12px 16px' }}>Total Sent</th>
+                  <th style={{ padding: '12px 16px' }}>Successful</th>
+                  <th style={{ padding: '12px 16px' }}>Failed</th>
+                  <th style={{ padding: '12px 16px' }}>Success Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {segments.map(item => (
+                  <tr key={item.tag} style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '700', textTransform: 'capitalize', color: 'var(--text-primary)' }}>
+                      <span className="status-pill active" style={{ fontSize: '11.5px', padding: '3px 8px', borderRadius: '4px' }}>
+                        {item.tag}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{item.total_sent}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--accent-teal)', fontWeight: '600' }}>{item.successful}</td>
+                    <td style={{ padding: '12px 16px', color: '#ef4444', fontWeight: '600' }}>{item.failed}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: '700', color: item.success_rate >= 80 ? 'var(--accent-teal)' : item.success_rate >= 50 ? '#f59e0b' : '#ef4444' }}>
+                          {item.success_rate}%
+                        </span>
+                        {/* Custom progress mini-bar */}
+                        <div style={{ width: '60px', height: '6px', borderRadius: '3px', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${item.success_rate}%`, height: '100%', 
+                            background: item.success_rate >= 80 ? 'var(--accent-teal)' : item.success_rate >= 50 ? '#f59e0b' : '#ef4444' 
+                          }}></div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}

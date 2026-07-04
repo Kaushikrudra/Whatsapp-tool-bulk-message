@@ -19,14 +19,10 @@ function escapeCSVValue(value) {
  */
 async function createCampaign(req, res) {
   try {
-    const {
-      name,
-      template_id,
-      list_id,
-      scheduled_at,
-      min_delay_seconds = 3,
-      max_delay_seconds = 8,
-      daily_limit = 200,
+    const { 
+      name, template_id, list_id, scheduled_at,
+      min_delay_seconds = 3, max_delay_seconds = 8, daily_limit = 200,
+      target_type = 'list', target_tags = []
     } = req.body;
 
     // Validation
@@ -36,20 +32,28 @@ async function createCampaign(req, res) {
     if (!template_id) {
       return res.status(400).json({ error: 'Template ID is required.' });
     }
-    if (!list_id) {
-      return res.status(400).json({ error: 'Contact List ID is required.' });
+
+    if (target_type === 'list') {
+      if (!list_id) {
+        return res.status(400).json({ error: 'Contact List ID is required when targeting by list.' });
+      }
+      // Verify contact list exists
+      const listCheck = await pool.query('SELECT id FROM contact_lists WHERE id = $1', [list_id]);
+      if (listCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Contact List not found.' });
+      }
+    } else if (target_type === 'tag') {
+      if (!Array.isArray(target_tags) || target_tags.length === 0) {
+        return res.status(400).json({ error: 'At least one target tag is required when targeting by tags.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid target type. Choose "list" or "tag".' });
     }
 
     // Verify template exists
     const templateCheck = await pool.query('SELECT id FROM templates WHERE id = $1', [template_id]);
     if (templateCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Template not found.' });
-    }
-
-    // Verify contact list exists
-    const listCheck = await pool.query('SELECT id FROM contact_lists WHERE id = $1', [list_id]);
-    if (listCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Contact List not found.' });
     }
 
     // Determine starting status: scheduled if in the future, else draft
@@ -64,18 +68,20 @@ async function createCampaign(req, res) {
     }
 
     const result = await pool.query(
-      `INSERT INTO campaigns (name, template_id, list_id, status, scheduled_at, min_delay_seconds, max_delay_seconds, daily_limit, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
+      `INSERT INTO campaigns (name, template_id, list_id, status, scheduled_at, min_delay_seconds, max_delay_seconds, daily_limit, target_type, target_tags, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
        RETURNING *`,
       [
         name.trim(),
         template_id,
-        list_id,
+        target_type === 'list' ? list_id : null,
         status,
         scheduleTime,
         parseInt(min_delay_seconds, 10),
         parseInt(max_delay_seconds, 10),
         parseInt(daily_limit, 10),
+        target_type,
+        target_type === 'tag' ? target_tags : [],
       ]
     );
 
@@ -105,10 +111,22 @@ async function getCampaigns(req, res) {
         c.*,
         t.name as template_name,
         cl.name as list_name,
-        COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id), 0)::int as total_contacts,
-        COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'sent'), 0)::int as sent_count,
-        COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'failed'), 0)::int as failed_count,
-        COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'queued'), 0)::int as pending_count
+        CASE 
+          WHEN c.target_type = 'tag' THEN COALESCE((SELECT COUNT(*) FROM contacts WHERE tags && c.target_tags), 0)::int
+          ELSE COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id), 0)::int
+        END as total_contacts,
+        CASE 
+          WHEN c.target_type = 'tag' THEN COALESCE((SELECT COUNT(*) FROM contacts WHERE tags && c.target_tags AND status = 'sent'), 0)::int
+          ELSE COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'sent'), 0)::int
+        END as sent_count,
+        CASE 
+          WHEN c.target_type = 'tag' THEN COALESCE((SELECT COUNT(*) FROM contacts WHERE tags && c.target_tags AND status = 'failed'), 0)::int
+          ELSE COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'failed'), 0)::int
+        END as failed_count,
+        CASE 
+          WHEN c.target_type = 'tag' THEN COALESCE((SELECT COUNT(*) FROM contacts WHERE tags && c.target_tags AND status = 'queued'), 0)::int
+          ELSE COALESCE((SELECT COUNT(*) FROM contacts WHERE list_id = c.list_id AND status = 'queued'), 0)::int
+        END as pending_count
       FROM campaigns c
       LEFT JOIN templates t ON c.template_id = t.id
       LEFT JOIN contact_lists cl ON c.list_id = cl.id
@@ -148,22 +166,40 @@ async function getCampaignById(req, res) {
     }
     const campaign = campaignRes.rows[0];
 
-    // Fetch total count of contacts associated with this list
-    const countRes = await pool.query(
-      'SELECT COUNT(*) FROM contacts WHERE list_id = $1',
-      [campaign.list_id]
-    );
-    const totalContacts = parseInt(countRes.rows[0].count, 10);
+    let totalContacts = 0;
+    let contactsResult;
 
-    // Fetch paginated contacts list
-    const contactsRes = await pool.query(
-      `SELECT phone_number, name, company, status, sent_at, failure_reason 
-       FROM contacts 
-       WHERE list_id = $1 
-       ORDER BY id ASC 
-       LIMIT $2 OFFSET $3`,
-      [campaign.list_id, limit, offset]
-    );
+    if (campaign.target_type === 'tag') {
+      const countRes = await pool.query(
+        'SELECT COUNT(*) FROM contacts WHERE tags && $1::TEXT[]',
+        [campaign.target_tags]
+      );
+      totalContacts = parseInt(countRes.rows[0].count, 10);
+
+      contactsResult = await pool.query(
+        `SELECT phone_number, name, company, status, sent_at, failure_reason 
+         FROM contacts 
+         WHERE tags && $1::TEXT[]
+         ORDER BY id ASC 
+         LIMIT $2 OFFSET $3`,
+        [campaign.target_tags, limit, offset]
+      );
+    } else {
+      const countRes = await pool.query(
+        'SELECT COUNT(*) FROM contacts WHERE list_id = $1',
+        [campaign.list_id]
+      );
+      totalContacts = parseInt(countRes.rows[0].count, 10);
+
+      contactsResult = await pool.query(
+        `SELECT phone_number, name, company, status, sent_at, failure_reason 
+         FROM contacts 
+         WHERE list_id = $1 
+         ORDER BY id ASC 
+         LIMIT $2 OFFSET $3`,
+        [campaign.list_id, limit, offset]
+      );
+    }
 
     // Fetch last 50 logs of the campaign
     const logsRes = await pool.query(
@@ -176,7 +212,7 @@ async function getCampaignById(req, res) {
 
     return res.json({
       campaign,
-      contacts: contactsRes.rows,
+      contacts: contactsResult.rows,
       logs: logsRes.rows,
       pagination: {
         page,
@@ -352,8 +388,8 @@ async function duplicateCampaign(req, res) {
     const copyName = `${original.name} (Copy)`;
 
     const duplicateRes = await pool.query(
-      `INSERT INTO campaigns (name, template_id, list_id, status, scheduled_at, last_sent_index, min_delay_seconds, max_delay_seconds, daily_limit, consecutive_fail_threshold, created_at, updated_at)
-       VALUES ($1, $2, $3, 'draft', NULL, 0, $4, $5, $6, $7, now(), now())
+      `INSERT INTO campaigns (name, template_id, list_id, status, scheduled_at, last_sent_index, min_delay_seconds, max_delay_seconds, daily_limit, consecutive_fail_threshold, target_type, target_tags, created_at, updated_at)
+       VALUES ($1, $2, $3, 'draft', NULL, 0, $4, $5, $6, $7, $8, $9, now(), now())
        RETURNING *`,
       [
         copyName,
@@ -363,6 +399,8 @@ async function duplicateCampaign(req, res) {
         original.max_delay_seconds,
         original.daily_limit,
         original.consecutive_fail_threshold,
+        original.target_type,
+        original.target_tags,
       ]
     );
 
