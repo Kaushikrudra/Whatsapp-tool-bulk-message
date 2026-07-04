@@ -82,7 +82,9 @@ body {
 
 .sidebar {
   width: 260px;
-  background-color: var(--bg-sidebar);
+  background: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 260 900' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 80,0 100,120' fill='rgba(255,255,255,0.05)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,0 100,120 0,150' fill='rgba(255,255,255,0.07)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='80,0 180,0 100,120' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='180,0 100,120 200,160' fill='rgba(255,255,255,0.05)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='180,0 260,0 200,160' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,0 200,160 260,140' fill='rgba(255,255,255,0.07)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,150 100,120 70,280' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,150 70,280 0,300' fill='rgba(255,255,255,0.04)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='100,120 200,160 170,320' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='100,120 70,280 170,320' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='200,160 260,140 170,320' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,140 170,320 260,290' fill='rgba(255,255,255,0.05)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,300 70,280 90,420' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,300 90,420 0,450' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='70,280 170,320 90,420' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='170,320 90,420 190,480' fill='rgba(255,255,255,0.05)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='170,320 260,290 190,480' fill='rgba(255,255,255,0.04)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,290 190,480 260,460' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,450 90,420 80,580' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,450 80,580 0,600' fill='rgba(255,255,255,0.05)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='90,420 190,480 180,620' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='90,420 80,580 180,620' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='190,480 260,460 180,620' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,460 180,620 260,590' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,600 80,580 100,720' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,600 100,720 0,750' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='80,580 180,620 100,720' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='180,620 100,720 170,780' fill='rgba(255,255,255,0.04)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='180,620 260,590 170,780' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,590 170,780 260,740' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,750 100,720 80,900' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='0,750 80,900 0,900' fill='rgba(255,255,255,0.04)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='100,720 170,780 180,900' fill='rgba(255,255,255,0.03)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='100,720 80,900 180,900' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='170,780 260,740 180,900' fill='rgba(255,255,255,0.02)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3Cpolygon points='260,740 180,900 260,900' fill='rgba(255,255,255,0.04)' stroke='rgba(255,255,255,0.15)' stroke-width='0.5'/%3E%3C/svg%3E") no-repeat center/100% 100%,
+    linear-gradient(135deg, #0a0f24 0%, #121b40 60%, #1e2963 100%) !important;
   border-right: 1px solid var(--border-sidebar);
   display: flex;
   flex-direction: column;
@@ -121,26 +123,30 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-sidebar);
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: var(--radius-sm);
   padding: 8px 12px;
 }
 
 .search-icon {
-  color: var(--text-sidebar-secondary);
-  opacity: 0.5;
+  color: #475569 !important;
+  opacity: 0.8 !important;
 }
 
 .search-wrapper input {
   background: transparent;
   border: none;
-  color: var(--text-sidebar-primary);
+  color: #0f172a !important;
   font-family: var(--font-family);
   font-size: 13px;
   outline: none;
   width: 100%;
   cursor: text;
+}
+
+.search-wrapper input::placeholder {
+  color: #64748b !important;
 }
 
 .sidebar-nav {

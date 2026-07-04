@@ -43,7 +43,11 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
     <aside className="sidebar">
       {/* Sidebar Logo */}
       <div className="sidebar-logo">
-        <span className="logo-icon">🚀</span>
+        <svg className="logo-icon" width="38" height="38" viewBox="30 40 140 120" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }}>
+          <path d="M35,70 L100,45 L100,155 L35,130 Z" fill="#4A6FA5"/>
+          <path d="M100,45 L165,70 L165,130 L100,155 Z" fill="#8FB3E0"/>
+          <path d="M112,80 Q135,100 112,120" fill="none" stroke="#EAF1FB" stroke-width="7" stroke-linecap="round"/>
+        </svg>
         <h2>Bulk Sender</h2>
       </div>
 
