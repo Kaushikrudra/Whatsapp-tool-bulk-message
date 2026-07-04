@@ -86,18 +86,26 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="sidebar-footer">
-        {status === 'connected' && (
+      <div className="sidebar-footer" style={{ padding: '16px 8px 8px 8px' }}>
+        {status !== 'connected' ? (
           <button
-            className="nav-item btn-sidebar-logout"
+            className="btn-sidebar-connect"
+            onClick={() => setActiveTab('connection')}
+          >
+            <Power size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Connect WhatsApp
+          </button>
+        ) : (
+          <button
+            className="btn-sidebar-logout"
             onClick={handleLogout}
             disabled={actionLoading}
           >
-            <Power className="nav-icon" size={16} />
+            <Power size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
             {actionLoading ? 'Disconnecting...' : 'Disconnect WhatsApp'}
           </button>
         )}
-        <div className="version-tag">Version 1.0 (Production Ready)</div>
+        <div className="version-tag">Version 1.0 Copyright © 2026</div>
       </div>
     </aside>
   );

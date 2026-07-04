@@ -217,10 +217,11 @@ body {
 
 .version-tag {
   font-size: 11px;
-  color: var(--text-sidebar-secondary);
-  opacity: 0.5;
+  color: #ffffff;
+  opacity: 0.9;
   text-align: left;
   padding-left: 8px;
+  margin-top: 12px;
 }
 
 /* --- Main Content Area & Top Header --- */
@@ -1057,22 +1058,53 @@ body {
   color: var(--text-muted);
 }
 
-/* --- Sidebar Logout Button --- */
+/* --- Sidebar Connect/Logout Buttons --- */
 
 .btn-sidebar-logout {
-  color: #f87171 !important;
-  border: 1px solid rgba(239, 68, 68, 0.15) !important;
-  background: rgba(239, 68, 68, 0.02) !important;
-  margin-bottom: 12px;
+  color: #ffffff !important;
+  border: 1px solid #ef4444 !important;
+  background: #ef4444 !important;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
 }
 
 .btn-sidebar-logout:hover:not(:disabled) {
-  background: var(--accent-red) !important;
-  color: white !important;
-  border-color: var(--accent-red) !important;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-sidebar-connect {
+  color: var(--accent-teal) !important;
+  border: 1px solid rgba(20, 184, 166, 0.3) !important;
+  background: rgba(20, 184, 166, 0.06) !important;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-sidebar-connect:hover:not(:disabled) {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Sidebar Search No Results style */
