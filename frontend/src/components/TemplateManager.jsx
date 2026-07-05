@@ -4,7 +4,7 @@ import { FileText, Save, Trash2, Edit3, X, Sparkles } from 'lucide-react';
 
 const BACKEND_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/templates`;
 
-function TemplateManager() {
+function TemplateManager({ showToast }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,8 +65,8 @@ function TemplateManager() {
       setMediaType(response.data.mediaType);
       setMediaFileName(file.name);
     } catch (err) {
-      console.error('Error uploading media:', err);
-      alert(err.response?.data?.error || 'Failed to upload media file.');
+      console.error('Error uploading file:', err);
+      showToast(err.response?.data?.error || 'Failed to upload media file.', 'error');
     } finally {
       setUploading(false);
     }
@@ -100,14 +100,84 @@ function TemplateManager() {
     }, 0);
   };
 
-  // Generate dynamic live preview text
-  const getPreviewText = (text) => {
+  // Generate dynamic live preview text with WhatsApp formatting
+  const formatWhatsAppText = (text) => {
     if (!text) return 'Start typing to see live preview...';
-    return text
+    
+    // First replace placeholders
+    let formatted = text
       .replace(/{name}/g, 'John')
       .replace(/{company}/g, 'Acme Corp')
       .replace(/{custom1}/g, 'SampleVar1')
       .replace(/{custom2}/g, 'SampleVar2');
+
+    // Split text by newlines to preserve them
+    const lines = formatted.split('\n');
+
+    return lines.map((line, lineIdx) => {
+      let tokens = [{ type: 'text', text: line }];
+      
+      // Parse triple-backticks for monospace code block
+      tokens = tokens.flatMap(token => {
+        if (token.type !== 'text') return token;
+        const parts = token.text.split('```');
+        return parts.map((part, index) => ({
+          type: index % 2 === 1 ? 'code' : 'text',
+          text: part
+        }));
+      });
+      
+      // Parse asterisks for bold
+      tokens = tokens.flatMap(token => {
+        if (token.type !== 'text') return token;
+        const parts = token.text.split('*');
+        return parts.map((part, index) => ({
+          type: index % 2 === 1 ? 'bold' : 'text',
+          text: part
+        }));
+      });
+
+      // Parse underscores for italic
+      tokens = tokens.flatMap(token => {
+        if (token.type !== 'text') return token;
+        const parts = token.text.split('_');
+        return parts.map((part, index) => ({
+          type: index % 2 === 1 ? 'italic' : 'text',
+          text: part
+        }));
+      });
+
+      // Parse tildes for strike
+      tokens = tokens.flatMap(token => {
+        if (token.type !== 'text') return token;
+        const parts = token.text.split('~');
+        return parts.map((part, index) => ({
+          type: index % 2 === 1 ? 'strike' : 'text',
+          text: part
+        }));
+      });
+
+      return (
+        <div key={lineIdx} style={{ minHeight: '1.4em' }}>
+          {tokens.map((t, tokenIdx) => {
+            if (t.text === '') return null;
+            switch (t.type) {
+              case 'code':
+                return <code key={tokenIdx} className="preview-monospace">{t.text}</code>;
+              case 'bold':
+                return <strong key={tokenIdx}>{t.text}</strong>;
+              case 'italic':
+                return <em key={tokenIdx}>{t.text}</em>;
+              case 'strike':
+                return <del key={tokenIdx}>{t.text}</del>;
+              case 'text':
+              default:
+                return <span key={tokenIdx}>{t.text}</span>;
+            }
+          })}
+        </div>
+      );
+    });
   };
 
   // Handle Save Template (Create or Update)
@@ -115,11 +185,11 @@ function TemplateManager() {
     e.preventDefault();
 
     if (!name.trim()) {
-      alert('Please enter a template name.');
+      showToast('Please enter a template name.', 'warning');
       return;
     }
     if (!body.trim()) {
-      alert('Please enter the template body.');
+      showToast('Please enter the template body.', 'warning');
       return;
     }
 
@@ -151,9 +221,10 @@ function TemplateManager() {
       setMediaFileName('');
       setEditingId(null);
       await fetchTemplates();
+      showToast(editingId ? 'Template updated successfully' : 'Template saved successfully', 'success');
     } catch (err) {
       console.error('Error saving template:', err);
-      alert(err.response?.data?.error || 'Failed to save template.');
+      showToast(err.response?.data?.error || 'Failed to save template.', 'error');
     } finally {
       setSaving(false);
     }
@@ -194,9 +265,10 @@ function TemplateManager() {
         handleCancelEdit();
       }
       await fetchTemplates();
+      showToast('Template deleted successfully', 'success');
     } catch (err) {
       console.error('Error deleting template:', err);
-      alert('Failed to delete template.');
+      showToast('Failed to delete template.', 'error');
     }
   };
 
@@ -414,39 +486,59 @@ function TemplateManager() {
                     <Sparkles size={16} className="text-teal" />
                     <span>Live Message Preview</span>
                   </div>
-                  <div className="whatsapp-chat-bubble" style={{ textAlign: 'left' }}>
-                    {mediaUrl && mediaType === 'image' && (
-                      <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden' }}>
-                        <img src={mediaUrl} alt="Preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover' }} />
+                  
+                  {/* WhatsApp Mobile Mockup */}
+                  <div className="whatsapp-phone-mockup">
+                    <div className="phone-header">
+                      <div className="phone-avatar">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="12" fill="rgba(255, 255, 255, 0.25)" />
+                          <circle cx="12" cy="9" r="4" fill="#ffffff" />
+                          <path d="M5 19C5 15.5 8 13.5 12 13.5C16 13.5 19 15.5 19 19" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+                        </svg>
                       </div>
-                    )}
-                    {mediaUrl && mediaType === 'pdf' && (
-                      <div className="bubble-media-preview" style={{ 
-                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', 
-                        background: 'rgba(0,0,0,0.03)', borderRadius: '6px', marginBottom: '8px',
-                        border: '1px solid rgba(0,0,0,0.05)', textAlign: 'left'
-                      }}>
-                        <FileText size={24} style={{ color: '#ef4444' }} />
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ fontSize: '13px', margin: 0, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {mediaFileName || 'document.pdf'}
-                          </p>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PDF Document</span>
-                        </div>
+                      <div className="phone-contact-info">
+                        <span className="phone-contact-name">WhatsApp Preview</span>
+                        <span className="phone-contact-status">online</span>
                       </div>
-                    )}
-                    {mediaUrl && mediaType === 'video' && (
-                      <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', background: '#000', maxHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <video src={mediaUrl} controls style={{ width: '100%', maxHeight: '180px' }} />
+                    </div>
+                    <div className="phone-body-chat">
+                      <div className="whatsapp-chat-bubble" style={{ textAlign: 'left' }}>
+                        {mediaUrl && mediaType === 'image' && (
+                          <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden' }}>
+                            <img src={mediaUrl} alt="Preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        {mediaUrl && mediaType === 'pdf' && (
+                          <div className="bubble-media-preview" style={{ 
+                            display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', 
+                            background: 'rgba(0,0,0,0.03)', borderRadius: '6px', marginBottom: '8px',
+                            border: '1px solid rgba(0,0,0,0.05)', textAlign: 'left'
+                          }}>
+                            <FileText size={24} style={{ color: '#ef4444' }} />
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontSize: '13px', margin: 0, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {mediaFileName || 'document.pdf'}
+                              </p>
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PDF Document</span>
+                            </div>
+                          </div>
+                        )}
+                        {mediaUrl && mediaType === 'video' && (
+                          <div className="bubble-media-preview" style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', background: '#000', maxHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <video src={mediaUrl} controls style={{ width: '100%', maxHeight: '180px' }} />
+                          </div>
+                        )}
+                        <div className="preview-text-render">{formatWhatsAppText(body)}</div>
+                        <span className="chat-bubble-time">
+                          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                    )}
-                    <p className="preview-text-render">{getPreviewText(body)}</p>
-                    <span className="chat-bubble-time">
-                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    </div>
                   </div>
+                  
                   <p className="preview-disclaimer">
-                    Note: *bold*, _italic_, and ~strikethrough~ markdown symbols will render correctly directly within WhatsApp client application interfaces.
+                    Note: Formatting triggers (`*bold*`, `_italic_`, `~strike~`, ` ```code``` `) will render styled text on mobile chat layouts as displayed above.
                   </p>
                 </div>
               </div>

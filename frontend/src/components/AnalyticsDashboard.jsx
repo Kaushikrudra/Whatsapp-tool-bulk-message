@@ -212,7 +212,7 @@ function AnalyticsDashboard() {
       )}
 
       {/* CHARTS CONTAINER GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', minHeight: '400px' }}>
+      <div className="analytics-charts-grid">
         
         {/* LEFT CHART: Delivery Timeline */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: '20px', minHeight: '380px' }}>

@@ -7,7 +7,7 @@ import {
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function CampaignManager() {
+function CampaignManager({ showToast }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,7 +85,7 @@ function CampaignManager() {
       setDetailPage(page);
     } catch (err) {
       console.error('Error fetching campaign detail:', err);
-      alert('Failed to load campaign details.');
+      showToast('Failed to load campaign details.', 'error');
       setSelectedCampaignId(null);
     } finally {
       setDetailLoading(false);
@@ -139,10 +139,10 @@ function CampaignManager() {
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
 
-    if (!name.trim()) return alert('Please enter a campaign name.');
-    if (targetType === 'list' && !listId) return alert('Please select a contact list.');
-    if (targetType === 'tag' && targetTags.length === 0) return alert('Please select at least one target tag segment.');
-    if (!templateId) return alert('Please select a message template.');
+    if (!name.trim()) return showToast('Please enter a campaign name.', 'warning');
+    if (targetType === 'list' && !listId) return showToast('Please select a contact list.', 'warning');
+    if (targetType === 'tag' && targetTags.length === 0) return showToast('Please select at least one target tag segment.', 'warning');
+    if (!templateId) return showToast('Please select a message template.', 'warning');
 
     try {
       await axios.post(`${BACKEND_URL}/campaigns`, {
@@ -173,9 +173,10 @@ function CampaignManager() {
       setShowCreateModal(false);
 
       await fetchCampaigns(true);
+      showToast('Campaign created successfully', 'success');
     } catch (err) {
       console.error('Error creating campaign:', err);
-      alert(err.response?.data?.error || 'Failed to create campaign.');
+      showToast(err.response?.data?.error || 'Failed to create campaign.', 'error');
     }
   };
 
@@ -185,8 +186,9 @@ function CampaignManager() {
       await axios.post(`${BACKEND_URL}/campaigns/${id}/launch`);
       await fetchCampaigns(false);
       if (selectedCampaignId === id) fetchCampaignDetail(id, detailPage);
+      showToast('Campaign launched successfully', 'success');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to launch campaign.');
+      showToast(err.response?.data?.error || 'Failed to launch campaign.', 'error');
     }
   };
 
@@ -195,8 +197,9 @@ function CampaignManager() {
       await axios.patch(`${BACKEND_URL}/campaigns/${id}/pause`);
       await fetchCampaigns(false);
       if (selectedCampaignId === id) fetchCampaignDetail(id, detailPage);
+      showToast('Campaign paused', 'info');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to pause campaign.');
+      showToast(err.response?.data?.error || 'Failed to pause campaign.', 'error');
     }
   };
 
@@ -205,8 +208,9 @@ function CampaignManager() {
       await axios.patch(`${BACKEND_URL}/campaigns/${id}/resume`);
       await fetchCampaigns(false);
       if (selectedCampaignId === id) fetchCampaignDetail(id, detailPage);
+      showToast('Campaign resumed', 'success');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to resume campaign.');
+      showToast(err.response?.data?.error || 'Failed to resume campaign.', 'error');
     }
   };
 
@@ -216,8 +220,9 @@ function CampaignManager() {
       await axios.delete(`${BACKEND_URL}/campaigns/${id}`);
       setSelectedCampaignId(null);
       await fetchCampaigns(true);
+      showToast('Campaign deleted successfully', 'success');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete campaign.');
+      showToast(err.response?.data?.error || 'Failed to delete campaign.', 'error');
     }
   };
 
@@ -225,8 +230,9 @@ function CampaignManager() {
     try {
       await axios.post(`${BACKEND_URL}/campaigns/${id}/duplicate`);
       await fetchCampaigns(true);
+      showToast('Campaign duplicated successfully', 'success');
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to duplicate campaign.');
+      showToast(err.response?.data?.error || 'Failed to duplicate campaign.', 'error');
     }
   };
 

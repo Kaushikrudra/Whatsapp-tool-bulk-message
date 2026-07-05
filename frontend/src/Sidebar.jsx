@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare, BarChart2, X } from 'lucide-react';
+import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare, BarChart2, X, Sun, Moon } from 'lucide-react';
 
-function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading, sidebarOpen, setSidebarOpen }) {
+function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Define nav links structurally for dynamic filtering
@@ -123,6 +123,52 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading,
             {actionLoading ? 'Disconnecting...' : 'Disconnect WhatsApp'}
           </button>
         )}
+        
+        {/* Theme Toggle Button */}
+        <div className="theme-toggle-container" style={{ marginTop: '12px', width: '100%' }}>
+          <button 
+            type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-sidebar-secondary)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+              transition: 'var(--transition-all)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.color = 'var(--text-sidebar-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+              e.currentTarget.style.color = 'var(--text-sidebar-secondary)';
+            }}
+          >
+            {theme === 'light' ? (
+              <>
+                <Moon size={15} />
+                <span>Dark Mode</span>
+              </>
+            ) : (
+              <>
+                <Sun size={15} />
+                <span>Light Mode</span>
+              </>
+            )}
+          </button>
+        </div>
+
         <div className="version-tag">Version 1.0 Copyright © 2026</div>
       </div>
     </aside>

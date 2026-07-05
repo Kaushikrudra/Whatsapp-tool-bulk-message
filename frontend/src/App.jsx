@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Menu } from 'lucide-react';
 import './App.css';
 import ContactUpload from './ContactUpload';
+import { ToastContainer } from './components/Toast';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import TemplateManager from './components/TemplateManager';
@@ -34,6 +35,30 @@ function App() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'connection' | 'contacts' | 'templates' | 'campaigns' | 'logs' | 'settings'
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Theme state
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  // Toasts state
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3500);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
   
   // Lists state
   const [lists, setLists] = useState([]);
@@ -189,7 +214,7 @@ function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${theme === 'dark' ? 'dark-theme' : ''}`}>
       {/* Sidebar backdrop for mobile/tablet */}
       {sidebarOpen && (
         <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>
@@ -204,6 +229,8 @@ function App() {
         actionLoading={actionLoading} 
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
+        theme={theme}
+        toggleTheme={toggleTheme}
       />
 
       {/* Main Content Area */}
@@ -248,6 +275,7 @@ function App() {
               getStatusLabel={getStatusLabel}
               error={error}
               loading={loading}
+              showToast={showToast}
             />
           )}
 
@@ -337,11 +365,12 @@ function App() {
               loadingLists={loadingLists} 
               fetchLists={fetchLists} 
               handleDeleteList={handleDeleteList} 
+              showToast={showToast}
             />
           )}
 
           {activeTab === 'templates' && (
-            <TemplateManager />
+            <TemplateManager showToast={showToast} />
           )}
 
           {activeTab === 'inbox' && (
@@ -349,7 +378,7 @@ function App() {
           )}
 
           {activeTab === 'campaigns' && (
-            <CampaignManager />
+            <CampaignManager showToast={showToast} />
           )}
 
           {activeTab === 'logs' && (
@@ -361,6 +390,9 @@ function App() {
           )}
         </div>
       </main>
+      
+      {/* Global Toast notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }
