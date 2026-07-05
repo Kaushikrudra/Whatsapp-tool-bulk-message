@@ -28,6 +28,10 @@ function Login({ onLoginSuccess }) {
       );
 
       if (response.data.success) {
+        if (response.data.token) {
+          localStorage.setItem('auth_token', response.data.token);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        }
         onLoginSuccess();
       } else {
         setError('Authorization failed. Please try again.');

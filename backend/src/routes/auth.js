@@ -14,10 +14,10 @@ router.post('/login', (req, res) => {
       signed: true,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: true,
+      sameSite: 'none',
     });
-    return res.json({ success: true });
+    return res.json({ success: true, token: 'admin_logged_in' });
   } else {
     return res.status(401).json({ error: 'Invalid username or password' });
   }

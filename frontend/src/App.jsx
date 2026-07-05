@@ -16,6 +16,12 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 // Configure Axios globally to pass cookies with requests
 axios.defaults.withCredentials = true;
 
+// Pre-initialize default Authorization header if token exists in localStorage
+const storedToken = localStorage.getItem('auth_token');
+if (storedToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+}
+
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function App() {
@@ -136,9 +142,11 @@ function App() {
   const handleDashboardLogout = async () => {
     try {
       await axios.post(`${BACKEND_URL}/auth/logout`);
-      setIsAuthenticated(false);
     } catch (err) {
       console.error('Error logging out of dashboard:', err);
+    } finally {
+      localStorage.removeItem('auth_token');
+      delete axios.defaults.headers.common['Authorization'];
       setIsAuthenticated(false);
     }
   };

@@ -23,7 +23,7 @@ const PORT = process.env.PORT || 5000;
 
 // Enable CORS middleware to allow requests from frontend clients
 app.use(cors({
-  origin: true,
+  origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : true,
   credentials: true
 }));
 
