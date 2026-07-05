@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Menu } from 'lucide-react';
 import './App.css';
 import ContactUpload from './ContactUpload';
 import Sidebar from './Sidebar';
@@ -26,6 +27,7 @@ function App() {
   const [error, setError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'connection' | 'contacts' | 'templates' | 'campaigns' | 'logs' | 'settings'
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Lists state
   const [lists, setLists] = useState([]);
@@ -180,6 +182,11 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Sidebar backdrop for mobile/tablet */}
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>
+      )}
+
       {/* Sidebar Component */}
       <Sidebar 
         activeTab={activeTab} 
@@ -187,6 +194,8 @@ function App() {
         status={status} 
         handleLogout={handleLogout} 
         actionLoading={actionLoading} 
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
       />
 
       {/* Main Content Area */}
@@ -194,8 +203,17 @@ function App() {
         {/* Top Header Bar */}
         <header className="top-header">
           <div className="header-left">
-            <h2>Welcome back, Admin!</h2>
-            <p className="header-subtitle">Manage your WhatsApp broadcasts and contacts</p>
+            <button 
+              className="hamburger-btn" 
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open Sidebar"
+            >
+              <Menu size={24} />
+            </button>
+            <div>
+              <h2>Welcome back, Admin!</h2>
+              <p className="header-subtitle">Manage your WhatsApp broadcasts and contacts</p>
+            </div>
           </div>
           <div className="header-right" style={{ gap: '12px' }}>
             <div className="connection-status-pill">

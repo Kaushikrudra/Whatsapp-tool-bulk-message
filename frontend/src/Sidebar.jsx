@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare, BarChart2 } from 'lucide-react';
+import { Home, Smartphone, Users, Power, Search, FileText, Send, Settings, Activity, MessageSquare, BarChart2, X } from 'lucide-react';
 
-function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading }) {
+function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading, sidebarOpen, setSidebarOpen }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Define nav links structurally for dynamic filtering
@@ -41,7 +41,7 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
     .filter(section => section.items.length > 0);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       {/* Sidebar Logo */}
       <div className="sidebar-logo">
         <svg className="logo-icon" width="38" height="38" viewBox="30 40 140 120" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }}>
@@ -50,6 +50,13 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
           <path d="M112,80 Q135,100 112,120" fill="none" stroke="#EAF1FB" stroke-width="7" stroke-linecap="round"/>
         </svg>
         <h2>Bulk Sender</h2>
+        <button 
+          className="sidebar-close-btn" 
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close Sidebar"
+        >
+          <X size={20} />
+        </button>
       </div>
 
       {/* Active Search Bar */}
@@ -76,7 +83,10 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
                 <button
                   key={item.id}
                   className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSidebarOpen(false);
+                  }}
                 >
                   <IconComponent className="nav-icon" size={18} />
                   {item.label}
@@ -95,7 +105,10 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading 
         {status !== 'connected' ? (
           <button
             className="btn-sidebar-connect"
-            onClick={() => setActiveTab('connection')}
+            onClick={() => {
+              setActiveTab('connection');
+              setSidebarOpen(false);
+            }}
           >
             <Power size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
             Connect WhatsApp
