@@ -54,7 +54,11 @@ function saveSettingsToFile(settings) {
  * Returns current application settings.
  */
 function getSettings() {
-  return currentSettings;
+  return {
+    ...currentSettings,
+    geminiApiKey: currentSettings.geminiApiKey || process.env.GEMINI_API_KEY || '',
+    geminiPromptInstructions: currentSettings.geminiPromptInstructions || process.env.GEMINI_PROMPT_INSTRUCTIONS || 'You are a helpful customer assistant. Keep replies short and concise.'
+  };
 }
 
 /**
