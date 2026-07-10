@@ -29,7 +29,10 @@ router.get('/conversations', async (req, res) => {
         lm.direction as last_message_direction,
         lm.timestamp as last_message_time,
         COALESCE(uc.unread_count, 0)::int as unread_count,
-        COALESCE(c.name, lm.phone_number) as contact_name
+        COALESCE(c.name, lm.phone_number) as contact_name,
+        COALESCE(ct.is_ai_enabled, false) as is_ai_enabled,
+        COALESCE(ct.is_manual_override, false) as is_manual_override,
+        COALESCE(ct.tags, '{}'::TEXT[]) as tags
       FROM latest_messages lm
       LEFT JOIN unread_counts uc ON lm.phone_number = uc.phone_number
       LEFT JOIN (
@@ -37,6 +40,7 @@ router.get('/conversations', async (req, res) => {
         FROM contacts
         ORDER BY phone_number, id DESC
       ) c ON lm.phone_number = c.phone_number
+      LEFT JOIN chat_threads ct ON lm.phone_number = ct.phone_number
       ORDER BY lm.timestamp DESC;
     `;
     const result = await pool.query(queryText);
@@ -84,6 +88,14 @@ router.post('/conversations/:phoneNumber/send', async (req, res) => {
       [phoneNumber, messageText.trim()]
     );
 
+    // Automatically set manual override to true when agent replies manually
+    await pool.query(
+      `INSERT INTO chat_threads (phone_number, is_manual_override, last_interaction)
+       VALUES ($1, true, now())
+       ON CONFLICT (phone_number) DO UPDATE SET is_manual_override = true, last_interaction = now()`,
+      [phoneNumber]
+    );
+
     return res.json(result.rows[0]);
   } catch (error) {
     console.error('Error sending manual reply:', error);
@@ -103,6 +115,70 @@ router.patch('/conversations/:phoneNumber/read', async (req, res) => {
   } catch (error) {
     console.error('Error marking messages as read:', error);
     return res.status(500).json({ error: 'Failed to mark messages as read.' });
+  }
+});
+
+// PATCH /api/chats/conversations/:phoneNumber/ai - Toggle AI bot activation for a conversation
+router.patch('/conversations/:phoneNumber/ai', async (req, res) => {
+  const { phoneNumber } = req.params;
+  const { isAiEnabled } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO chat_threads (phone_number, is_ai_enabled, last_interaction)
+       VALUES ($1, $2, now())
+       ON CONFLICT (phone_number) DO UPDATE SET is_ai_enabled = $2, last_interaction = now()
+       RETURNING *`,
+      [phoneNumber, !!isAiEnabled]
+    );
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error toggling AI status:', error);
+    return res.status(500).json({ error: 'Failed to toggle AI chatbot status.' });
+  }
+});
+
+// PATCH /api/chats/conversations/:phoneNumber/override - Toggle Manual Override / Takeover mode
+router.patch('/conversations/:phoneNumber/override', async (req, res) => {
+  const { phoneNumber } = req.params;
+  const { isManualOverride } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO chat_threads (phone_number, is_manual_override, last_interaction)
+       VALUES ($1, $2, now())
+       ON CONFLICT (phone_number) DO UPDATE SET is_manual_override = $2, last_interaction = now()
+       RETURNING *`,
+      [phoneNumber, !!isManualOverride]
+    );
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error toggling manual override:', error);
+    return res.status(500).json({ error: 'Failed to toggle manual override status.' });
+  }
+});
+
+// PATCH /api/chats/conversations/:phoneNumber/tags - Update tags for a chat conversation
+router.patch('/conversations/:phoneNumber/tags', async (req, res) => {
+  const { phoneNumber } = req.params;
+  const { tags } = req.body; // Must be an array of strings
+
+  if (!Array.isArray(tags)) {
+    return res.status(400).json({ error: 'Tags must be an array of strings.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO chat_threads (phone_number, tags, last_interaction)
+       VALUES ($1, $2, now())
+       ON CONFLICT (phone_number) DO UPDATE SET tags = $2, last_interaction = now()
+       RETURNING *`,
+      [phoneNumber, tags]
+    );
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating chat tags:', error);
+    return res.status(500).json({ error: 'Failed to update chat tags.' });
   }
 });
 

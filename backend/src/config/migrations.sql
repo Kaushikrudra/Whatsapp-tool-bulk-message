@@ -84,3 +84,24 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'list';
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_tags TEXT[] DEFAULT '{}';
 ALTER TABLE campaigns ALTER COLUMN list_id DROP NOT NULL;
+
+-- Create bot_rules table for keyword auto-replies
+CREATE TABLE IF NOT EXISTS bot_rules (
+  id SERIAL PRIMARY KEY,
+  keyword TEXT NOT NULL UNIQUE,
+  response_text TEXT NOT NULL,
+  match_type TEXT DEFAULT 'contains', -- contains | exact
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+-- Create chat_threads table to manage active chat overrides, tags and IVR state
+CREATE TABLE IF NOT EXISTS chat_threads (
+  phone_number TEXT PRIMARY KEY,
+  is_ai_enabled BOOLEAN DEFAULT true,
+  ivr_state TEXT DEFAULT 'idle', -- idle | menu_sent
+  tags TEXT[] DEFAULT '{}',
+  is_manual_override BOOLEAN DEFAULT false,
+  last_interaction TIMESTAMP DEFAULT now()
+);
+

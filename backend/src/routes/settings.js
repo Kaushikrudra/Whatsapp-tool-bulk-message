@@ -19,6 +19,14 @@ router.put('/', (req, res) => {
       sendWindowStart,
       sendWindowEnd,
       webhookUrl,
+      globalGreetingEnabled,
+      globalGreetingText,
+      awayModeEnabled,
+      awayModeStart,
+      awayModeEnd,
+      awayModeText,
+      geminiApiKey,
+      geminiPromptInstructions,
     } = req.body;
 
     const updates = {};
@@ -92,6 +100,54 @@ router.put('/', (req, res) => {
         return res.status(400).json({ error: 'Webhook URL must be a valid HTTP or HTTPS URL.' });
       }
       updates.webhookUrl = val;
+    }
+
+    // Validate globalGreetingEnabled: boolean
+    if (globalGreetingEnabled !== undefined) {
+      updates.globalGreetingEnabled = !!globalGreetingEnabled;
+    }
+
+    // Validate globalGreetingText: string
+    if (globalGreetingText !== undefined) {
+      updates.globalGreetingText = String(globalGreetingText).trim();
+    }
+
+    // Validate awayModeEnabled: boolean
+    if (awayModeEnabled !== undefined) {
+      updates.awayModeEnabled = !!awayModeEnabled;
+    }
+
+    // Validate awayModeStart: HH:MM
+    if (awayModeStart !== undefined) {
+      const val = String(awayModeStart).trim();
+      if (!timeFormatRegex.test(val)) {
+        return res.status(400).json({ error: 'Away mode start time must be in valid HH:MM format.' });
+      }
+      updates.awayModeStart = val;
+    }
+
+    // Validate awayModeEnd: HH:MM
+    if (awayModeEnd !== undefined) {
+      const val = String(awayModeEnd).trim();
+      if (!timeFormatRegex.test(val)) {
+        return res.status(400).json({ error: 'Away mode end time must be in valid HH:MM format.' });
+      }
+      updates.awayModeEnd = val;
+    }
+
+    // Validate awayModeText: string
+    if (awayModeText !== undefined) {
+      updates.awayModeText = String(awayModeText).trim();
+    }
+
+    // Validate geminiApiKey: string
+    if (geminiApiKey !== undefined) {
+      updates.geminiApiKey = String(geminiApiKey).trim();
+    }
+
+    // Validate geminiPromptInstructions: string
+    if (geminiPromptInstructions !== undefined) {
+      updates.geminiPromptInstructions = String(geminiPromptInstructions).trim();
     }
 
     // Perform updates

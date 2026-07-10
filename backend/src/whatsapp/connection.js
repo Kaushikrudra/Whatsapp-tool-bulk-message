@@ -240,6 +240,236 @@ async function initWhatsApp(isReconnect = false) {
                 })
               }).catch(webhookErr => console.error('[Webhook] Failed to dispatch received message alert:', webhookErr.message));
             }
+
+            // --- INBOX AUTOMATION SYSTEM HANDLER ---
+            try {
+              // 1. Fetch or initialize chat_threads state for metadata
+              let threadRes = await pool.query('SELECT * FROM chat_threads WHERE phone_number = $1', [phoneNumber]);
+              let thread = null;
+              if (threadRes.rows.length === 0) {
+                // Check if this is the first message ever from this number
+                const msgCountRes = await pool.query('SELECT COUNT(*) FROM messages WHERE phone_number = $1', [phoneNumber]);
+                const isFirstMessage = parseInt(msgCountRes.rows[0].count, 10) <= 1;
+
+                const insertRes = await pool.query(
+                  `INSERT INTO chat_threads (phone_number, is_ai_enabled, ivr_state, tags, is_manual_override, last_interaction)
+                   VALUES ($1, true, 'idle', '{}', false, now())
+                   ON CONFLICT (phone_number) DO UPDATE SET last_interaction = now()
+                   RETURNING *`,
+                  [phoneNumber]
+                );
+                thread = insertRes.rows[0];
+                thread.isFirstMessage = isFirstMessage;
+              } else {
+                thread = threadRes.rows[0];
+                thread.isFirstMessage = false;
+                await pool.query('UPDATE chat_threads SET last_interaction = now() WHERE phone_number = $1', [phoneNumber]);
+              }
+
+              // Only run automation if Manual Override/Takeover is NOT active
+              if (!thread.is_manual_override) {
+                
+                // A. Away Mode Response (Time-window based)
+                if (settings.awayModeEnabled && settings.awayModeText) {
+                  if (checkIfWithinWindow(settings.awayModeStart, settings.awayModeEnd)) {
+                    // Prevent spam: only reply away once every 12 hours
+                    const recentAwayRes = await pool.query(
+                      `SELECT COUNT(*) FROM messages 
+                       WHERE phone_number = $1 
+                         AND direction = 'outgoing' 
+                         AND message_text = $2 
+                         AND timestamp > now() - interval '12 hours'`,
+                      [phoneNumber, settings.awayModeText]
+                    );
+                    const recentAwayCount = parseInt(recentAwayRes.rows[0].count, 10);
+                    
+                    if (recentAwayCount === 0) {
+                      await sendTextMessage(jid, settings.awayModeText);
+                      await pool.query(
+                        "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                        [phoneNumber, settings.awayModeText]
+                      );
+                    }
+                    return; // Stop processing further automations since business is away
+                  }
+                }
+
+                // B. Global Greeting Message (Sent on very first message)
+                if (settings.globalGreetingEnabled && settings.globalGreetingText && thread.isFirstMessage) {
+                  await sendTextMessage(jid, settings.globalGreetingText);
+                  await pool.query(
+                    "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                    [phoneNumber, settings.globalGreetingText]
+                  );
+                }
+
+                // C. IVR Interactive Menu Chatbot
+                const incomingText = text.trim().toLowerCase();
+                
+                if (incomingText === 'menu' || thread.ivr_state === 'menu_sent') {
+                  const menuText = `Hi! Options select karne ke liye number reply karein:\n\n1. Order status check karein\n2. Product list dekhein\n3. Chat Support (Agent se baat karein)`;
+                  
+                  if (incomingText === 'menu') {
+                    await sendTextMessage(jid, menuText);
+                    await pool.query(
+                      "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                      [phoneNumber, menuText]
+                    );
+                    await pool.query("UPDATE chat_threads SET ivr_state = 'menu_sent' WHERE phone_number = $1", [phoneNumber]);
+                    return;
+                  } else if (thread.ivr_state === 'menu_sent') {
+                    if (incomingText === '1') {
+                      const reply = "Aapka latest order status: Dispatched hai aur transit me hai. Delivery expected within 2 days.";
+                      await sendTextMessage(jid, reply);
+                      await pool.query(
+                        "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                        [phoneNumber, reply]
+                      );
+                      await pool.query("UPDATE chat_threads SET ivr_state = 'idle' WHERE phone_number = $1", [phoneNumber]);
+                      return;
+                    } else if (incomingText === '2') {
+                      const reply = "Humare main products:\n1. Bulk messaging API\n2. Chatbot builder\n3. CRM Integrations\n4. Two-Way Inbox Automation";
+                      await sendTextMessage(jid, reply);
+                      await pool.query(
+                        "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                        [phoneNumber, reply]
+                      );
+                      await pool.query("UPDATE chat_threads SET ivr_state = 'idle' WHERE phone_number = $1", [phoneNumber]);
+                      return;
+                    } else if (incomingText === '3') {
+                      const reply = "Aapko humare support agent se connect kiya ja raha hai. Please wait... Aap yahan direct message type kar sakte hain.";
+                      await sendTextMessage(jid, reply);
+                      await pool.query(
+                        "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                        [phoneNumber, reply]
+                      );
+                      
+                      // Transition to human: Set manual override = true, and attach tags
+                      const currentTags = thread.tags || [];
+                      const newTags = Array.from(new Set([...currentTags, 'Agent Required', 'High Priority']));
+                      await pool.query(
+                        `UPDATE chat_threads 
+                         SET ivr_state = 'idle', 
+                             is_manual_override = true, 
+                             tags = $2
+                         WHERE phone_number = $1`,
+                        [phoneNumber, newTags]
+                      );
+                      return;
+                    } else {
+                      // Re-send IVR Menu if invalid response
+                      await sendTextMessage(jid, "Invalid choice. Please select from the menu:\n\n" + menuText);
+                      await pool.query(
+                        "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                        [phoneNumber, "Invalid choice. Please select from the menu:\n\n" + menuText]
+                      );
+                      return;
+                    }
+                  }
+                }
+
+                // D. Keyword-Triggered Rules (Rules-Based matching)
+                const rulesRes = await pool.query('SELECT * FROM bot_rules WHERE is_active = true');
+                let matchedRule = null;
+                for (const rule of rulesRes.rows) {
+                  const kw = rule.keyword.toLowerCase();
+                  if (rule.match_type === 'exact') {
+                    if (incomingText === kw) {
+                      matchedRule = rule;
+                      break;
+                    }
+                  } else {
+                    if (incomingText.includes(kw)) {
+                      matchedRule = rule;
+                      break;
+                    }
+                  }
+                }
+
+                if (matchedRule) {
+                  await sendTextMessage(jid, matchedRule.response_text);
+                  await pool.query(
+                    "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                    [phoneNumber, matchedRule.response_text]
+                  );
+                  return;
+                }
+
+                // E. Gemini AI Chatbot Integration
+                if (thread.is_ai_enabled && settings.geminiApiKey) {
+                  try {
+                    // Retrieve past 10 messages for contextual background
+                    const historyRes = await pool.query(
+                      `SELECT direction, message_text FROM messages 
+                       WHERE phone_number = $1 
+                       ORDER BY timestamp DESC LIMIT 10`,
+                      [phoneNumber]
+                    );
+                    const history = historyRes.rows.reverse();
+
+                    let contextText = `Instructions:\n${settings.geminiPromptInstructions}\n\nConversation history:\n`;
+                    for (const h of history) {
+                      contextText += `${h.direction === 'incoming' ? 'Customer' : 'Assistant'}: ${h.message_text}\n`;
+                    }
+                    contextText += `Assistant:`;
+
+                    // Generate AI reply using direct REST API fetch call
+                    const response = await fetch(
+                      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${settings.geminiApiKey}`,
+                      {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          contents: [{ parts: [{ text: contextText }] }]
+                        })
+                      }
+                    );
+
+                    if (response.ok) {
+                      const resJson = await response.json();
+                      const aiText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+                      if (aiText && aiText.trim()) {
+                        const cleanAiText = aiText.trim();
+                        await sendTextMessage(jid, cleanAiText);
+                        await pool.query(
+                          "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                          [phoneNumber, cleanAiText]
+                        );
+                        return;
+                      }
+                    } else {
+                      const errTxt = await response.text();
+                      console.error('[Gemini API Error] response status:', response.status, errTxt);
+                    }
+                  } catch (geminiErr) {
+                    console.error('Error invoking Gemini AI:', geminiErr.message);
+                  }
+                }
+
+                // F. Auto-Tagging & Chat Assignment (Negative keywords check)
+                const lowerText = text.toLowerCase();
+                const highPriorityKeywords = ['complain', 'refund', 'fraud', 'fail', 'error', 'kharab', 'bekar', 'galat'];
+                let shouldTagHighPriority = false;
+                for (const kw of highPriorityKeywords) {
+                  if (lowerText.includes(kw)) {
+                    shouldTagHighPriority = true;
+                    break;
+                  }
+                }
+
+                if (shouldTagHighPriority) {
+                  const currentTags = thread.tags || [];
+                  const newTags = Array.from(new Set([...currentTags, 'High Priority', 'Agent Required']));
+                  await pool.query(
+                    `UPDATE chat_threads SET tags = $2 WHERE phone_number = $1`,
+                    [phoneNumber, newTags]
+                  );
+                }
+              }
+
+            } catch (autoErr) {
+              console.error('Error processing inbox automation waterfall:', autoErr.message);
+            }
           }
         } catch (err) {
           console.error('[Connection] Failed to log WhatsApp message:', err.message);
@@ -337,6 +567,19 @@ async function sendMediaMessage(jid, mediaUrl, mediaType, captionText) {
     return await sock.sendMessage(jid, { video: { url: mediaUrl }, caption: captionText });
   } else {
     return await sock.sendMessage(jid, { text: captionText });
+  }
+}
+
+function checkIfWithinWindow(start, end) {
+  if (!start || !end) return false;
+  const now = new Date();
+  const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  if (start <= end) {
+    return currentTimeStr >= start && currentTimeStr <= end;
+  } else {
+    // Over midnight case
+    return currentTimeStr >= start || currentTimeStr <= end;
   }
 }
 

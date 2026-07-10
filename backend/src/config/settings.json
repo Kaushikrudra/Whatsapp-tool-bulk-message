@@ -6,5 +6,13 @@
   "sendWindowEnabled": false,
   "sendWindowStart": "10:00",
   "sendWindowEnd": "19:00",
-  "webhookUrl": ""
+  "webhookUrl": "",
+  "globalGreetingEnabled": false,
+  "globalGreetingText": "Welcome to Pixel Labs! How can we help you today?",
+  "awayModeEnabled": false,
+  "awayModeStart": "18:00",
+  "awayModeEnd": "09:00",
+  "awayModeText": "We are currently offline. We will get back to you at 9:00 AM.",
+  "geminiApiKey": "",
+  "geminiPromptInstructions": "You are a helpful customer assistant. Keep replies short and concise."
 }

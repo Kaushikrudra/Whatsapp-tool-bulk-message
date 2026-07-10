@@ -14,6 +14,7 @@ const authRouter = require('./routes/auth');
 const chatsRouter = require('./routes/chats');
 const mediaRouter = require('./routes/media');
 const analyticsRouter = require('./routes/analytics');
+const botRulesRouter = require('./routes/botRules');
 const { initWhatsApp } = require('./whatsapp/connection');
 const { testConnection, runMigrations } = require('./config/db');
 const { initQueue } = require('./queue/campaignQueue');
@@ -47,6 +48,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/chats', chatsRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/bot-rules', botRulesRouter);
 
 // Start the Express server
 app.listen(PORT, async () => {
