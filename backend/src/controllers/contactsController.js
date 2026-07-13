@@ -54,6 +54,11 @@ function parseXLSX(buffer) {
  */
 async function handleContactUpload(req, res) {
   try {
+    const consentConfirmed = req.body.consent_confirmed === true || req.body.consent_confirmed === 'true';
+    if (!consentConfirmed) {
+      return res.status(400).json({ error: 'Please confirm that all contacts in this list have given consent to receive WhatsApp messages before uploading.' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded. Please select a .csv or .xlsx file.' });
     }
@@ -154,7 +159,7 @@ async function handleContactUpload(req, res) {
         let paramIndex = 1;
 
         for (const contact of batch) {
-          valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`);
+          valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7})`);
           queryValues.push(
             listId,
             contact.phone_number,
@@ -162,13 +167,14 @@ async function handleContactUpload(req, res) {
             contact.company,
             contact.custom1,
             contact.custom2,
-            contact.tags
+            contact.tags,
+            true
           );
-          paramIndex += 7;
+          paramIndex += 8;
         }
 
         const insertQueryText = `
-          INSERT INTO contacts (list_id, phone_number, name, company, custom1, custom2, tags)
+          INSERT INTO contacts (list_id, phone_number, name, company, custom1, custom2, tags, has_consent)
           VALUES ${valuePlaceholders.join(', ')}
         `;
         await client.query(insertQueryText, queryValues);

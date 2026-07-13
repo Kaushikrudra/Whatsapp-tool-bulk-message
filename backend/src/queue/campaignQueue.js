@@ -149,28 +149,28 @@ function initQueue() {
 
     if (campaign.target_type === 'tag') {
       const totalCountRes = await pool.query(
-        'SELECT COUNT(*) FROM contacts WHERE tags && $1::TEXT[]',
+        'SELECT COUNT(*) FROM contacts WHERE tags && $1::TEXT[] AND has_consent = true',
         [campaign.target_tags]
       );
       totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
 
       const contactsRes = await pool.query(
         `SELECT * FROM contacts 
-         WHERE tags && $1::TEXT[] AND status = 'queued' 
+         WHERE tags && $1::TEXT[] AND status = 'queued' AND has_consent = true 
          ORDER BY id ASC`,
         [campaign.target_tags]
       );
       contacts = contactsRes.rows;
     } else {
       const totalCountRes = await pool.query(
-        'SELECT COUNT(*) FROM contacts WHERE list_id = $1',
+        'SELECT COUNT(*) FROM contacts WHERE list_id = $1 AND has_consent = true',
         [campaign.list_id]
       );
       totalContactsInCampaign = parseInt(totalCountRes.rows[0].count, 10);
 
       const contactsRes = await pool.query(
         `SELECT * FROM contacts 
-         WHERE list_id = $1 AND status = 'queued' 
+         WHERE list_id = $1 AND status = 'queued' AND has_consent = true 
          ORDER BY id ASC`,
         [campaign.list_id]
       );
@@ -347,7 +347,7 @@ function initQueue() {
 
     // Check if there are any remaining queued contacts left for this campaign
     const remainingCountRes = await pool.query(
-      "SELECT COUNT(*) FROM contacts WHERE list_id = $1 AND status = 'queued'",
+      "SELECT COUNT(*) FROM contacts WHERE list_id = $1 AND status = 'queued' AND has_consent = true",
       [campaign.list_id]
     );
     const remainingCount = parseInt(remainingCountRes.rows[0].count, 10);

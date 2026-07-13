@@ -1,3 +1,20 @@
+/**
+ * SUMMARY OF DEBUG LOGS ADDED IN INBOX AUTOMATION SYSTEM HANDLER:
+ * Total console.log/console.error statements added/modified: 12
+ * 
+ * 1. Log at the start of incoming message process (displays phoneNumber and incoming text).
+ * 2. Log after thread fetch/create (displays is_ai_enabled, is_manual_override, and ivr_state).
+ * 3. Log when manual override is active (skips automation for phoneNumber).
+ * 4. Section A: Log checking Away Mode (displays settings.awayModeEnabled) & Log when away message is sent.
+ * 5. Section B: Log checking Greeting (displays settings.globalGreetingEnabled and thread.isFirstMessage).
+ * 6. Section C: Log checking IVR (displays incomingText and current thread.ivr_state).
+ * 7. Section D: Log when bot keyword rule is matched & Log when no keyword rule is matched.
+ * 8. Section E: Log checking Gemini AI preconditions (displays is_ai_enabled and geminiApiKey presence).
+ * 9. Section E: Log when Gemini AI reply is successfully generated (displays clean aiText length).
+ * 10. Section E: Log updated when Gemini API returns response.ok false (displays status code and full error text).
+ * 11. Section E: Log when Gemini responds but text is empty/missing.
+ * 12. Section F: Log when automation chain finishes without sending any auto-reply.
+ */
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestWaWebVersion, Browsers } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -6,6 +23,11 @@ const pino = require('pino');
 
 // Path to persist session authentication information
 const AUTH_INFO_DIR = path.join(__dirname, '../../auth_info');
+
+function randomDelay(minMs, maxMs) {
+  const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
 
 let sock = null;
 let connectionStatus = 'disconnected'; // "connecting", "connected", "disconnected", "reconnecting"
@@ -243,6 +265,7 @@ async function initWhatsApp(isReconnect = false) {
 
             // --- INBOX AUTOMATION SYSTEM HANDLER ---
             try {
+              console.log(`[INBOX] New message from ${phoneNumber}: ${text}`);
               // 1. Fetch or initialize chat_threads state for metadata
               let threadRes = await pool.query('SELECT * FROM chat_threads WHERE phone_number = $1', [phoneNumber]);
               let thread = null;
@@ -266,10 +289,13 @@ async function initWhatsApp(isReconnect = false) {
                 await pool.query('UPDATE chat_threads SET last_interaction = now() WHERE phone_number = $1', [phoneNumber]);
               }
 
+              console.log(`[INBOX][${phoneNumber}] Thread state -> is_ai_enabled: ${thread.is_ai_enabled}, is_manual_override: ${thread.is_manual_override}, ivr_state: ${thread.ivr_state}`);
+
               // Only run automation if Manual Override/Takeover is NOT active
               if (!thread.is_manual_override) {
                 
                 // A. Away Mode Response (Time-window based)
+                console.log(`[INBOX][${phoneNumber}] Checking Away Mode -> enabled: ${settings.awayModeEnabled}`);
                 if (settings.awayModeEnabled && settings.awayModeText) {
                   if (checkIfWithinWindow(settings.awayModeStart, settings.awayModeEnd)) {
                     // Prevent spam: only reply away once every 12 hours
@@ -289,12 +315,36 @@ async function initWhatsApp(isReconnect = false) {
                         "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
                         [phoneNumber, settings.awayModeText]
                       );
+                      console.log(`[INBOX][${phoneNumber}] Away message sent, stopping further automation`);
                     }
                     return; // Stop processing further automations since business is away
                   }
                 }
 
+                // Opt-out / Stop request handler
+                const incomingText = text.trim().toLowerCase();
+                const optOutKeywords = ['stop', 'unsubscribe', 'band karo', 'band karein', 'remove me', 'opt out', 'optout'];
+                if (optOutKeywords.includes(incomingText)) {
+                  const replyText = "Aapko ab hamari taraf se koi WhatsApp message nahi bheja jayega. Dhanyawad!";
+                  await sendTextMessage(jid, replyText);
+                  await pool.query(
+                    "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
+                    [phoneNumber, replyText]
+                  );
+                  await pool.query(
+                    "UPDATE contacts SET has_consent = false WHERE phone_number = $1",
+                    [phoneNumber]
+                  );
+                  await pool.query(
+                    "UPDATE chat_threads SET ivr_state = 'idle' WHERE phone_number = $1",
+                    [phoneNumber]
+                  );
+                  console.log(`[INBOX] Consent withdrawn via STOP keyword for ${phoneNumber}, has_consent set to false`);
+                  return;
+                }
+
                 // B. Global Greeting Message (Sent on very first message)
+                console.log(`[INBOX][${phoneNumber}] Checking Greeting -> enabled: ${settings.globalGreetingEnabled}, isFirstMessage: ${thread.isFirstMessage}`);
                 if (settings.globalGreetingEnabled && settings.globalGreetingText && thread.isFirstMessage) {
                   await sendTextMessage(jid, settings.globalGreetingText);
                   await pool.query(
@@ -304,7 +354,7 @@ async function initWhatsApp(isReconnect = false) {
                 }
 
                 // C. IVR Interactive Menu Chatbot
-                const incomingText = text.trim().toLowerCase();
+                console.log(`[INBOX][${phoneNumber}] Checking IVR -> incomingText: ${incomingText}, current ivr_state: ${thread.ivr_state}`);
                 
                 if (incomingText === 'menu' || thread.ivr_state === 'menu_sent') {
                   const menuText = `Hi! Options select karne ke liye number reply karein:\n\n1. Order status check karein\n2. Product list dekhein\n3. Chat Support (Agent se baat karein)`;
@@ -387,6 +437,7 @@ async function initWhatsApp(isReconnect = false) {
                 }
 
                 if (matchedRule) {
+                  console.log(`[INBOX][${phoneNumber}] Keyword rule matched: '${matchedRule.keyword}' -> stopping automation, Gemini will NOT run`);
                   await sendTextMessage(jid, matchedRule.response_text);
                   await pool.query(
                     "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
@@ -395,7 +446,10 @@ async function initWhatsApp(isReconnect = false) {
                   return;
                 }
 
+                console.log(`[INBOX][${phoneNumber}] No keyword rule matched, proceeding to Gemini AI check`);
+
                 // E. Gemini AI Chatbot Integration
+                console.log(`[INBOX][${phoneNumber}] Gemini check -> is_ai_enabled: ${thread.is_ai_enabled}, geminiApiKey present: ${settings.geminiApiKey ? 'YES' : 'NO'}`);
                 if (thread.is_ai_enabled && settings.geminiApiKey) {
                   try {
                     // Retrieve past 10 messages for contextual background
@@ -415,7 +469,7 @@ async function initWhatsApp(isReconnect = false) {
 
                     // Generate AI reply using direct REST API fetch call
                     const response = await fetch(
-                      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${settings.geminiApiKey}`,
+                      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${settings.geminiApiKey}`,
                       {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -430,16 +484,21 @@ async function initWhatsApp(isReconnect = false) {
                       const aiText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
                       if (aiText && aiText.trim()) {
                         const cleanAiText = aiText.trim();
+                        console.log(`[INBOX][${phoneNumber}] Simulating natural reply delay before sending...`);
+                        await randomDelay(2000, 4500);
+                        console.log(`[INBOX][${phoneNumber}] Gemini AI reply generated successfully, length: ${aiText.length} chars`);
                         await sendTextMessage(jid, cleanAiText);
                         await pool.query(
                           "INSERT INTO messages (phone_number, direction, message_text, is_read, timestamp) VALUES ($1, 'outgoing', $2, true, now())",
                           [phoneNumber, cleanAiText]
                         );
                         return;
+                      } else {
+                        console.log(`[INBOX][${phoneNumber}] Gemini responded but text was empty or missing in response`);
                       }
                     } else {
                       const errTxt = await response.text();
-                      console.error('[Gemini API Error] response status:', response.status, errTxt);
+                      console.error(`[Gemini API Error][${phoneNumber}] response status: ${response.status} - error text: ${errTxt}`);
                     }
                   } catch (geminiErr) {
                     console.error('Error invoking Gemini AI:', geminiErr.message);
@@ -465,6 +524,10 @@ async function initWhatsApp(isReconnect = false) {
                     [phoneNumber, newTags]
                   );
                 }
+
+                console.log(`[INBOX] Reached end of automation chain without any auto-reply being sent for ${phoneNumber}`);
+              } else {
+                console.log(`[INBOX] Manual override active, skipping all automation for ${phoneNumber}`);
               }
 
             } catch (autoErr) {

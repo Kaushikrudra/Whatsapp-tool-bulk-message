@@ -11,6 +11,7 @@ function ContactUpload({ lists, loadingLists, fetchLists, handleDeleteList }) {
   // Upload state
   const [file, setFile] = useState(null);
   const [uploadTags, setUploadTags] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
@@ -83,9 +84,14 @@ function ContactUpload({ lists, loadingLists, fetchLists, handleDeleteList }) {
       setError('Please select a CSV or Excel file to upload.');
       return;
     }
+    if (!consentChecked) {
+      setError('Please confirm consent before uploading.');
+      return;
+    }
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('consent_confirmed', 'true');
     if (uploadTags.trim()) {
       formData.append('tags', uploadTags);
     }
@@ -104,6 +110,7 @@ function ContactUpload({ lists, loadingLists, fetchLists, handleDeleteList }) {
       setSummary(response.data);
       setFile(null);
       setUploadTags('');
+      setConsentChecked(false);
       
       // Reset input element
       document.getElementById('contact-file-input').value = '';
@@ -272,10 +279,23 @@ function ContactUpload({ lists, loadingLists, fetchLists, handleDeleteList }) {
                 </div>
               </div>
 
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="consent-checkbox"
+                  checked={consentChecked}
+                  onChange={(e) => setConsentChecked(e.target.checked)}
+                  style={{ marginTop: '3px', cursor: 'pointer' }}
+                />
+                <label htmlFor="consent-checkbox" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: '1.4' }}>
+                  I confirm all contacts in this list have given explicit consent (opt-in) to receive WhatsApp messages from this business, as required by WhatsApp's Business Messaging Policy.
+                </label>
+              </div>
+
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={uploading || !file}
+                disabled={uploading || !file || !consentChecked}
                 style={{ alignSelf: 'flex-start' }}
               >
                 {uploading ? 'Processing & Uploading...' : 'Upload Contacts'}
