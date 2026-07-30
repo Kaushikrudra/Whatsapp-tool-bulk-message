@@ -49,7 +49,7 @@ function Sidebar({ activeTab, setActiveTab, status, handleLogout, actionLoading,
           <path d="M100,45 L165,70 L165,130 L100,155 Z" fill="#8FB3E0"/>
           <path d="M112,80 Q135,100 112,120" fill="none" stroke="#EAF1FB" stroke-width="7" stroke-linecap="round"/>
         </svg>
-        <h2>Bulk Sender</h2>
+        <h2>BulkChat</h2>
         <button 
           className="sidebar-close-btn" 
           onClick={() => setSidebarOpen(false)}

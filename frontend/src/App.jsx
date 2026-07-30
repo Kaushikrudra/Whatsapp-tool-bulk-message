@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import { Menu } from 'lucide-react';
 import './App.css';
@@ -10,34 +11,26 @@ import TemplateManager from './components/TemplateManager';
 import CampaignManager from './components/CampaignManager';
 import Settings from './components/Settings';
 import SystemLogs from './components/SystemLogs';
-import Login from './components/Login';
 import ChatInbox from './components/ChatInbox';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 
-// Configure Axios globally to pass cookies with requests
-axios.defaults.withCredentials = true;
+import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LandingPage from './pages/LandingPage';
+import AuthPage from './pages/AuthPage';
+import ConnectWhatsAppPage from './pages/ConnectWhatsAppPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 
-// Pre-initialize default Authorization header if token exists in localStorage
-const storedToken = localStorage.getItem('auth_token');
-if (storedToken) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-}
+axios.defaults.withCredentials = true;
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [status, setStatus] = useState('disconnected');
-  const [qr, setQr] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'connection' | 'contacts' | 'templates' | 'campaigns' | 'logs' | 'settings'
+function DashboardLayout() {
+  const { logout, whatsappStatus, qr, fetchWhatsAppStatus } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Theme state
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Toasts state
   const [toasts, setToasts] = useState([]);
@@ -64,56 +57,7 @@ function App() {
   const [lists, setLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
-  // Check if authenticated on startup
-  const checkAuth = async () => {
-    try {
-      // Query templates endpoint to check auth
-      await axios.get(`${BACKEND_URL}/campaigns`);
-      setIsAuthenticated(true);
-    } catch {
-      setIsAuthenticated(false);
-    } finally {
-      setCheckingAuth(false);
-    }
-  };
-
-  // Register Axios response interceptor to intercept 401 unauthorized errors globally
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (err) => {
-        if (err.response && err.response.status === 401) {
-          setIsAuthenticated(false);
-        }
-        return Promise.reject(err);
-      }
-    );
-    return () => {
-      axios.interceptors.response.eject(interceptor);
-    };
-  }, []);
-
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  // Function to fetch the connection status from the backend API
-  const fetchStatus = async () => {
-    try {
-      const response = await axios.get(`${BACKEND_URL}/status`);
-      setStatus(response.data.status);
-      setQr(response.data.qr);
-      setError(false);
-    } catch (err) {
-      console.error('Error fetching connection status:', err);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Function to fetch contact lists metadata
+  // Fetch contact lists metadata
   const fetchLists = async () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/contacts/lists`);
@@ -139,93 +83,52 @@ function App() {
     }
   };
 
-  // Poll status every 3 seconds and fetch lists only if authenticated
   useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    fetchStatus();
     fetchLists();
-    const interval = setInterval(fetchStatus, 3000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, []);
 
-  // Handle WhatsApp logout/disconnect session
-  const handleLogout = async () => {
+  const handleWhatsAppLogout = async () => {
     setActionLoading(true);
     try {
       await axios.post(`${BACKEND_URL}/logout`);
-      await fetchStatus();
+      await fetchWhatsAppStatus();
     } catch (err) {
-      console.error('Error logging out:', err);
-      alert('Failed to log out. Please try again.');
+      console.error('Error logging out WhatsApp session:', err);
+      alert('Failed to log out WhatsApp session. Please try again.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Handle dashboard login logout
-  const handleDashboardLogout = async () => {
-    try {
-      await axios.post(`${BACKEND_URL}/auth/logout`);
-    } catch (err) {
-      console.error('Error logging out of dashboard:', err);
-    } finally {
-      localStorage.removeItem('auth_token');
-      delete axios.defaults.headers.common['Authorization'];
-      setIsAuthenticated(false);
-    }
-  };
-
-  // Helper to get styling classes based on connection status
   const getStatusBadgeClass = () => {
-    switch (status) {
+    switch (whatsappStatus) {
       case 'connected': return 'badge status-connected';
       case 'connecting': return 'badge status-connecting';
       case 'reconnecting': return 'badge status-reconnecting';
-      case 'disconnected':
-      default:
-        return 'badge status-disconnected';
+      default: return 'badge status-disconnected';
     }
   };
 
-  // Display status text label nicely
   const getStatusLabel = () => {
-    switch (status) {
+    switch (whatsappStatus) {
       case 'connected': return 'Connected';
       case 'connecting': return 'Connecting...';
       case 'reconnecting': return 'Reconnecting...';
-      case 'disconnected':
-      default:
-        return 'Disconnected';
+      default: return 'Disconnected';
     }
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="loading-state" style={{ height: '100vh', justifyContent: 'center' }}>
-        <div className="spinner"></div>
-        <p>Authenticating session...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
-  }
-
   return (
     <div className={`app-container ${theme === 'dark' ? 'dark-theme' : ''}`}>
-      {/* Sidebar backdrop for mobile/tablet */}
       {sidebarOpen && (
         <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>
       )}
 
-      {/* Sidebar Component */}
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        status={status} 
-        handleLogout={handleLogout} 
+        status={whatsappStatus} 
+        handleLogout={handleWhatsAppLogout} 
         actionLoading={actionLoading} 
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
@@ -233,9 +136,7 @@ function App() {
         toggleTheme={toggleTheme}
       />
 
-      {/* Main Content Area */}
       <main className="main-content">
-        {/* Top Header Bar */}
         <header className="top-header">
           <div className="header-left">
             <button 
@@ -255,33 +156,30 @@ function App() {
               <span className="status-dot-label">WhatsApp:</span>
               <span className={getStatusBadgeClass()}>{getStatusLabel()}</span>
             </div>
-            <button onClick={handleDashboardLogout} className="btn-pagination" style={{ padding: '8px 16px', fontWeight: '600' }}>
+            <button onClick={logout} className="btn-pagination" style={{ padding: '8px 16px', fontWeight: '600' }}>
               Sign Out
             </button>
           </div>
         </header>
 
-        {/* Content Panel */}
         <div className="content-container">
           {activeTab === 'dashboard' && (
             <Dashboard 
               lists={lists} 
-              status={status} 
+              status={whatsappStatus} 
               qr={qr} 
-              handleLogout={handleLogout} 
+              handleLogout={handleWhatsAppLogout} 
               actionLoading={actionLoading} 
               handleDeleteList={handleDeleteList}
               getStatusBadgeClass={getStatusBadgeClass}
               getStatusLabel={getStatusLabel}
-              error={error}
-              loading={loading}
+              error={false}
+              loading={false}
               showToast={showToast}
             />
           )}
 
-          {activeTab === 'analytics' && (
-            <AnalyticsDashboard />
-          )}
+          {activeTab === 'analytics' && <AnalyticsDashboard />}
 
           {activeTab === 'connection' && (
             <div className="card">
@@ -291,70 +189,57 @@ function App() {
               </header>
 
               <main className="card-body">
-                {error && (
-                  <div className="alert alert-error">
-                    <strong>Server Unreachable:</strong> Could not connect to backend at <code>{BACKEND_URL}</code>. Please check if the backend server is running.
+                <div className="status-section">
+                  <div className="status-indicator">
+                    <span className="status-dot-label">Session Status:</span>
+                    <span className={getStatusBadgeClass()}>{getStatusLabel()}</span>
                   </div>
-                )}
 
-                {loading && !error ? (
-                  <div className="loading-state">
-                    <div className="spinner"></div>
-                    <p>Checking WhatsApp status...</p>
-                  </div>
-                ) : (
-                  <div className="status-section">
-                    <div className="status-indicator">
-                      <span className="status-dot-label">Session Status:</span>
-                      <span className={getStatusBadgeClass()}>{getStatusLabel()}</span>
+                  {whatsappStatus === 'connected' ? (
+                    <div className="connected-view">
+                      <div className="success-icon">✅</div>
+                      <h3>WhatsApp Connected</h3>
+                      <p className="success-message">The bulk sender engine is ready to send messages.</p>
+                      
+                      <button 
+                        onClick={handleWhatsAppLogout} 
+                        className="btn btn-logout" 
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? 'Disconnecting...' : 'Disconnect Session'}
+                      </button>
                     </div>
-
-                    {status === 'connected' ? (
-                      <div className="connected-view">
-                        <div className="success-icon">✅</div>
-                        <h3>WhatsApp Connected</h3>
-                        <p className="success-message">The bulk sender engine is ready to send messages.</p>
-                        
-                        <button 
-                          onClick={handleLogout} 
-                          className="btn btn-logout" 
-                          disabled={actionLoading}
-                        >
-                          {actionLoading ? 'Disconnecting...' : 'Disconnect Session'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="disconnected-view">
-                        {qr ? (
-                          <div className="qr-container">
-                            <div className="qr-box">
-                              <img src={qr} alt="WhatsApp Setup QR Code" className="qr-image" />
-                            </div>
-                            <div className="instructions">
-                              <h4>Scan QR Code</h4>
-                              <ol>
-                                <li>Open WhatsApp on your mobile phone.</li>
-                                <li>Tap <strong>Menu</strong> (Android) or <strong>Settings</strong> (iOS).</li>
-                                <li>Select <strong>Linked Devices</strong> and tap <strong>Link a Device</strong>.</li>
-                                <li>Point your phone's camera at this screen to scan the QR code.</li>
-                              </ol>
-                            </div>
+                  ) : (
+                    <div className="disconnected-view">
+                      {qr ? (
+                        <div className="qr-container">
+                          <div className="qr-box">
+                            <img src={qr} alt="WhatsApp Setup QR Code" className="qr-image" />
                           </div>
-                        ) : (
-                          <div className="qr-placeholder">
-                            <div className="spinner"></div>
-                            <p>Initializing WhatsApp socket & generating QR code...</p>
-                            <span className="helper-text">This may take a moment if the server is starting up.</span>
+                          <div className="instructions">
+                            <h4>Scan QR Code</h4>
+                            <ol>
+                              <li>Open WhatsApp on your mobile phone.</li>
+                              <li>Tap <strong>Menu</strong> (Android) or <strong>Settings</strong> (iOS).</li>
+                              <li>Select <strong>Linked Devices</strong> and tap <strong>Link a Device</strong>.</li>
+                              <li>Point your phone's camera at this screen to scan the QR code.</li>
+                            </ol>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                        </div>
+                      ) : (
+                        <div className="qr-placeholder">
+                          <div className="spinner"></div>
+                          <p>Initializing WhatsApp socket & generating QR code...</p>
+                          <span className="helper-text">This may take a moment if the server is starting up.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </main>
 
               <footer className="card-footer">
-                <p>&copy; {new Date().getFullYear()} Pixel WhatsApp Tool. All rights reserved.</p>
+                <p>&copy; {new Date().getFullYear()} BulkChat WhatsApp Tool. All rights reserved.</p>
               </footer>
             </div>
           )}
@@ -369,31 +254,55 @@ function App() {
             />
           )}
 
-          {activeTab === 'templates' && (
-            <TemplateManager showToast={showToast} />
-          )}
-
-          {activeTab === 'inbox' && (
-            <ChatInbox />
-          )}
-
-          {activeTab === 'campaigns' && (
-            <CampaignManager showToast={showToast} />
-          )}
-
-          {activeTab === 'logs' && (
-            <SystemLogs />
-          )}
-
-          {activeTab === 'settings' && (
-            <Settings />
-          )}
+          {activeTab === 'templates' && <TemplateManager showToast={showToast} />}
+          {activeTab === 'inbox' && <ChatInbox />}
+          {activeTab === 'campaigns' && <CampaignManager showToast={showToast} />}
+          {activeTab === 'logs' && <SystemLogs />}
+          {activeTab === 'settings' && <Settings />}
         </div>
       </main>
       
-      {/* Global Toast notifications */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<AuthPage initialMode="login" />} />
+          <Route path="/signup" element={<AuthPage initialMode="signup" />} />
+          <Route 
+            path="/connect-whatsapp" 
+            element={
+              <ProtectedRoute targetStep="connect">
+                <ConnectWhatsAppPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/subscription" 
+            element={
+              <ProtectedRoute targetStep="subscription">
+                <SubscriptionPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/*" 
+            element={
+              <ProtectedRoute targetStep="dashboard">
+                <DashboardLayout />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

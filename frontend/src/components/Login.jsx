@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react';
 
 const LOGIN_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/login`;
 
 function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -51,7 +53,7 @@ function Login({ onLoginSuccess }) {
         <header className="card-header border-none pb-0">
           <div className="login-logo">
             <span className="logo-icon">🚀</span>
-            <h2>Bulk Sender Admin</h2>
+            <h2>BulkChat Admin</h2>
           </div>
           <p className="subtitle">Sign in to manage WhatsApp campaigns and contact lists</p>
         </header>
@@ -68,7 +70,7 @@ function Login({ onLoginSuccess }) {
                 type="text"
                 id="login-username"
                 className="file-input"
-                placeholder="e.g. admin"
+                placeholder="e.g. kaushikrudra610@gmail.com"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -80,16 +82,39 @@ function Login({ onLoginSuccess }) {
               <label htmlFor="login-password" className="form-label">
                 Password
               </label>
-              <input
-                type="password"
-                id="login-password"
-                className="file-input"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="login-password"
+                  className="file-input"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  style={{ paddingRight: '42px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px'
+                  }}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -104,7 +129,7 @@ function Login({ onLoginSuccess }) {
         </main>
 
         <footer className="card-footer">
-          <p>&copy; {new Date().getFullYear()} Pixel WhatsApp Tool. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} BulkChat WhatsApp Tool. All rights reserved.</p>
         </footer>
       </div>
     </div>

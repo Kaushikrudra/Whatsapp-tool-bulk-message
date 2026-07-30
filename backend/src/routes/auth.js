@@ -5,7 +5,7 @@ const router = express.Router();
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
   
-  const user = process.env.DASHBOARD_USER || 'admin';
+  const user = process.env.DASHBOARD_USER || 'kaushikrudra610@gmail.com';
   const pass = process.env.DASHBOARD_PASS || 'admin123';
 
   if (username === user && password === pass) {

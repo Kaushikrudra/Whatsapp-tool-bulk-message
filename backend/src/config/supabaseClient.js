@@ -10,10 +10,10 @@ if (typeof global.WebSocket === 'undefined') {
 }
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-  console.warn('[Supabase] Warning: SUPABASE_URL or SUPABASE_ANON_KEY is missing or contains placeholder. Supabase Storage client won\'t function correctly.');
+  console.warn('[Supabase] Warning: SUPABASE_URL or SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY is missing or contains placeholder. Supabase client won\'t function correctly.');
 }
 
 const supabase = createClient(

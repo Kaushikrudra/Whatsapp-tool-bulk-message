@@ -106,3 +106,16 @@ CREATE TABLE IF NOT EXISTS chat_threads (
   last_interaction TIMESTAMP DEFAULT now()
 );
 
+-- Create users table for Supabase Auth users and subscription tracking
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  subscription_status TEXT DEFAULT 'inactive', -- 'inactive' | 'active' | 'expired'
+  plan_expiry TIMESTAMP NULL,
+  razorpay_payment_id TEXT NULL,
+  razorpay_order_id TEXT NULL,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+

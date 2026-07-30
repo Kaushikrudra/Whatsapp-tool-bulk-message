@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const authMiddleware = require('./middleware/auth');
+const subscriptionGuard = require('./middleware/subscriptionGuard');
 const statusRouter = require('./routes/status');
 const contactsRouter = require('./routes/contacts');
 const templatesRouter = require('./routes/templates');
@@ -15,6 +16,8 @@ const chatsRouter = require('./routes/chats');
 const mediaRouter = require('./routes/media');
 const analyticsRouter = require('./routes/analytics');
 const botRulesRouter = require('./routes/botRules');
+const subscriptionRouter = require('./routes/subscription');
+const userRouter = require('./routes/user');
 const { initWhatsApp } = require('./whatsapp/connection');
 const { testConnection, runMigrations } = require('./config/db');
 const { initQueue } = require('./queue/campaignQueue');
@@ -37,18 +40,22 @@ app.use(express.json());
 // Apply authentication middleware globally to all /api endpoints
 app.use('/api', authMiddleware);
 
-// Mount the connection status routes under /api
+// Public/gate API endpoints (accessible before active subscription)
 app.use('/api', statusRouter);
-app.use('/api/contacts', contactsRouter);
-app.use('/api/templates', templatesRouter);
-app.use('/api/campaigns', campaignsRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/logs', logsRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/chats', chatsRouter);
-app.use('/api/media', mediaRouter);
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/bot-rules', botRulesRouter);
+app.use('/api/subscription', subscriptionRouter);
+app.use('/api/user', userRouter);
+
+// Protected dashboard API endpoints (require active subscription)
+app.use('/api/contacts', subscriptionGuard, contactsRouter);
+app.use('/api/templates', subscriptionGuard, templatesRouter);
+app.use('/api/campaigns', subscriptionGuard, campaignsRouter);
+app.use('/api/settings', subscriptionGuard, settingsRouter);
+app.use('/api/logs', subscriptionGuard, logsRouter);
+app.use('/api/chats', subscriptionGuard, chatsRouter);
+app.use('/api/media', subscriptionGuard, mediaRouter);
+app.use('/api/analytics', subscriptionGuard, analyticsRouter);
+app.use('/api/bot-rules', subscriptionGuard, botRulesRouter);
 
 // Start the Express server
 app.listen(PORT, async () => {
